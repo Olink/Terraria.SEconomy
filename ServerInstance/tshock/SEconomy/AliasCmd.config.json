@@ -1,0 +1,36 @@
+{
+  "CommandAliases": [
+    {
+      "CommandAlias": "testparms",
+      "CommandsToExecute": [
+        "/bc Input param 1 2 3: $1 $2 $3",
+        "/bc Input param 1-3: $1-3",
+        "/bc Input param 2 to end of line: $2-"
+      ],
+      "Cost": "0c",
+      "Permissions": "",
+      "UsageHelpText": "",
+      "CooldownSeconds": 0
+    },
+    {
+      "CommandAlias": "testrandm",
+      "CommandsToExecute": [
+        "/bc Random Number: $random(1,100)"
+      ],
+      "Cost": "0c",
+      "Permissions": "",
+      "UsageHelpText": "",
+      "CooldownSeconds": 0
+    },
+    {
+      "CommandAlias": "imp",
+      "CommandsToExecute": [
+        "$runas($1,$2-)"
+      ],
+      "Cost": "0c",
+      "Permissions": "",
+      "UsageHelpText": "",
+      "CooldownSeconds": 0
+    }
+  ]
+}

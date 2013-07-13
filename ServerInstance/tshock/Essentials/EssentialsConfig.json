@@ -1,0 +1,19 @@
+{
+  "ShowBackMessageOnDeath": true,
+  "PrefixNicknamesWith": "~",
+  "LockRedTeam": false,
+  "RedTeamPassword": "",
+  "RedTeamPermission": "essentials.team.red",
+  "LockGreenTeam": true,
+  "GreenTeamPassword": "",
+  "GreenTeamPermission": "essentials.team.green",
+  "LockBlueTeam": true,
+  "BlueTeamPassword": "",
+  "BlueTeamPermission": "essentials.team.blue",
+  "LockYellowTeam": false,
+  "YellowTeamPassword": "",
+  "YellowTeamPermission": "essentials.team.yellow",
+  "DisableSetHomeInRegions": [
+    "example"
+  ]
+}

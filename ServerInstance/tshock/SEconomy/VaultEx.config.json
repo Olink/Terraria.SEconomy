@@ -1,0 +1,12 @@
+{
+  "BattlePotionModifier": 0.75,
+  "OptionalMobModifier": {},
+  "AnnounceKillGain": false,
+  "AnnounceBossGain": true,
+  "StaticDeathPenalty": false,
+  "DeathPenaltyMax": 10000,
+  "DeathPenaltyMin": 10000,
+  "DeathPenaltyPercent": 10,
+  "PvPWinnerTakesLoosersPenalty": true,
+  "BossRewardModifier": 1.0
+}

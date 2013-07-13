@@ -1,0 +1,17 @@
+{
+  "DefineSignCommands": "[Sign Command]",
+  "CommandsStartWith": ">",
+  "CooldownGroups": {
+    "global-time": 300,
+    "heal": 60,
+    "message": 10,
+    "damage": 10,
+    "boss": 300,
+    "item": 300,
+    "buff": 300,
+    "spawnmob": 300,
+    "kit": 300,
+    "command": 300
+  },
+  "ShowDestroyMessage": true
+}

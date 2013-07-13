@@ -1,0 +1,21 @@
+{
+  "BankAccountsEnabled": true,
+  "StartingMoney": "0",
+  "PayIntervalMinutes": 30,
+  "IdleThresholdMinutes": 10,
+  "IntervalPayAmount": "0",
+  "Modules": [
+    {
+      "Name": "VaultEx",
+      "DllFile": "internal",
+      "Enabled": true,
+      "ConfigFilePath": "tshock\\SEconomy\\VaultEx.config.json"
+    },
+    {
+      "Name": "CmdAliasPlugin",
+      "DllFile": "internal",
+      "Enabled": true,
+      "ConfigFilePath": "tshock\\SEconomy\\AliasCmd.config.json"
+    }
+  ]
+}
