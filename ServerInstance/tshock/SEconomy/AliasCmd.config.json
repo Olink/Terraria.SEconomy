@@ -28,7 +28,7 @@
         "$runas($1,$2-)"
       ],
       "Cost": "0c",
-      "Permissions": "",
+      "Permissions": "superadmin",
       "UsageHelpText": "",
       "CooldownSeconds": 0
     }

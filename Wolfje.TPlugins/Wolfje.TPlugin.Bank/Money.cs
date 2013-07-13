@@ -110,23 +110,25 @@ namespace Wolfje.Plugins.SEconomy {
         /// </summary>
         public override string ToString() {
             StringBuilder sb = new StringBuilder();
+            Money moneyCopy = this;
 
             //Negative balances still need to display like they are positives
-            if (this < 0) {
-                this *= (-1);
+            if (moneyCopy < 0) {
+                sb.Append("-");
+                moneyCopy = moneyCopy * (-1);
             }
 
-            if (this.Platinum > 0) {
-                sb.AppendFormat("{0}p", this.Platinum);
+            if (moneyCopy.Platinum > 0) {
+                sb.AppendFormat("{0}p", moneyCopy.Platinum);
             }
-            if (this.Gold > 0) {
-                sb.AppendFormat("{0}g", this.Gold);
+            if (moneyCopy.Gold > 0) {
+                sb.AppendFormat("{0}g", moneyCopy.Gold);
             }
-            if (this.Silver > 0) {
-                sb.AppendFormat("{0}s", this.Silver);
+            if (moneyCopy.Silver > 0) {
+                sb.AppendFormat("{0}s", moneyCopy.Silver);
             }
-                
-            sb.AppendFormat("{0}c", this.Copper);
+
+            sb.AppendFormat("{0}c", moneyCopy.Copper);
             
             return sb.ToString();
         }
@@ -136,27 +138,29 @@ namespace Wolfje.Plugins.SEconomy {
         /// </summary>
         public string ToLongString(bool ShowNegativeSign = false) {
             StringBuilder sb = new StringBuilder();
+            Money moneyCopy = this;
 
             //Negative balances still need to display like they are positives
-            if (this < 0) {
-                this *= (-1);
+            if (moneyCopy < 0) {
                 if (ShowNegativeSign) {
                     sb.Append("-");
                 }
+
+                moneyCopy = moneyCopy * (-1);
             }
 
-            if (this.Platinum > 0) {
-                sb.AppendFormat("{0} plat", this.Platinum);
+            if (moneyCopy.Platinum > 0) {
+                sb.AppendFormat("{0} plat", moneyCopy.Platinum);
             }
-            if (this.Gold > 0) {
-                sb.AppendFormat("{1}{0} gold", this.Gold, sb.Length > 0 ? " " : "");
+            if (moneyCopy.Gold > 0) {
+                sb.AppendFormat("{1}{0} gold", moneyCopy.Gold, sb.Length > 0 ? " " : "");
             }
-            if (this.Silver > 0) {
-                sb.AppendFormat("{1}{0} silver", this.Silver, sb.Length > 0 ? " " : "");
+            if (moneyCopy.Silver > 0) {
+                sb.AppendFormat("{1}{0} silver", moneyCopy.Silver, sb.Length > 0 ? " " : "");
             }
 
-            if (this.Copper > 0 || this._moneyValue == 0) {
-                sb.AppendFormat("{1}{0} copper", this.Copper, sb.Length > 0 ? " " : "");
+            if (moneyCopy.Copper > 0 || moneyCopy._moneyValue == 0) {
+                sb.AppendFormat("{1}{0} copper", moneyCopy.Copper, sb.Length > 0 ? " " : "");
             }
 
             return sb.ToString();

@@ -245,7 +245,8 @@ namespace Wolfje.Plugins.SEconomy.Economy {
         }
 
         public static bool TransferMaySucceed(BankAccount FromAccount, BankAccount ToAccount, Money MoneyNeeded, BankAccountTransferOptions Options) {
-            return (((!FromAccount.IsSystemAccount || !FromAccount.IsPluginAccount || (Options & BankAccountTransferOptions.AllowDeficitOnNormalAccount) == BankAccountTransferOptions.AllowDeficitOnNormalAccount) || FromAccount.Money >= MoneyNeeded));
+            //return (((!FromAccount.IsSystemAccount || !FromAccount.IsPluginAccount || (Options & BankAccountTransferOptions.AllowDeficitOnNormalAccount) == BankAccountTransferOptions.AllowDeficitOnNormalAccount) || FromAccount.Money >= MoneyNeeded));
+            return ((FromAccount.IsSystemAccount || FromAccount.IsPluginAccount || ((Options & BankAccountTransferOptions.AllowDeficitOnNormalAccount) == BankAccountTransferOptions.AllowDeficitOnNormalAccount)) || FromAccount.Money >= MoneyNeeded);
         }
 
         /// <summary>
