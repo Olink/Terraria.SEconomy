@@ -8,7 +8,8 @@ namespace Wolfje.Plugins.SEconomy.DatabaseObjects {
 
     [Flags]
     public enum BankAccountTransactionFlags {
-        FundsAvailable = 1
+        FundsAvailable = 1,
+        Squashed = 1 << 1
     }
     
     public class BankAccountTransaction {

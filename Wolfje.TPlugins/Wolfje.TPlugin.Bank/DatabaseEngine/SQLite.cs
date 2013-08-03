@@ -84,11 +84,26 @@ namespace SQLite
         AutoIncPK = 4      // force PK field to be auto inc
     }
 
+
+    
+        public class BackupProgressEventArgs : EventArgs {
+            public string DatabaseName { get; set; }
+            public int Progress { get; set; }
+
+            public BackupProgressEventArgs(string dbName, int progress) {
+                this.DatabaseName = dbName;
+                this.Progress = progress;
+            }
+        }
+
 	/// <summary>
 	/// Represents an open connection to a SQLite database.
 	/// </summary>
 	public partial class SQLiteConnection : IDisposable
 	{
+
+        public static event EventHandler<BackupProgressEventArgs> BackupProgress;
+
 		private bool _open;
 		private TimeSpan _busyTimeout;
 		private Dictionary<string, TableMapping> _mappings = null;
@@ -197,6 +212,69 @@ namespace SQLite
 			utf8Length = System.Text.Encoding.UTF8.GetBytes(s, 0, s.Length, bytes, 0);
 			return bytes;
 		}
+
+        public SQLite3.Result LoadFromFile(string importFilePath) {
+            IntPtr backupHandle;
+            Sqlite3DatabaseHandle fileHandle;
+            SQLite3.Result rc;
+
+            rc = SQLite3.Open(GetNullTerminatedUtf8(importFilePath), out fileHandle, (int)(SQLiteOpenFlags.ReadOnly), IntPtr.Zero);
+            if (rc == SQLite3.Result.OK) {
+                backupHandle = SQLite3.BackupInit(this.Handle, "main", fileHandle, "main");
+                if (backupHandle != IntPtr.Zero) {
+                    rc = SQLite3.BackupStep(backupHandle, -1);
+                    SQLite3.BackupFinish(backupHandle);
+                }
+            }
+           
+            SQLite3.Close(fileHandle);
+           
+            return rc;
+        }
+        
+        /// <summary>
+        /// http://www.sqlite.org/backup.html
+        /// </summary>
+        public SQLite3.Result BackupDatabaseToFile(Sqlite3DatabaseHandle handle, string databaseName, string destinationFileName) {
+            SQLite3.Result functionCode = 0;
+            int oldProgress = -1;
+            Sqlite3DatabaseHandle dbBackupHandle;
+            IntPtr dbBackup;
+            functionCode = SQLite3.Open(GetNullTerminatedUtf8(destinationFileName), out dbBackupHandle, (int)(SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.FullMutex), IntPtr.Zero);
+
+            if (functionCode == SQLite3.Result.OK) {
+                dbBackup = SQLite3.BackupInit(dbBackupHandle, databaseName, this.Handle, databaseName);
+
+                if (dbBackup != IntPtr.Zero) {
+                    do {
+                        functionCode = SQLite3.BackupStep(dbBackup, 500);
+                        int newProgress = Convert.ToInt32(100 * ((decimal)SQLite3.BackupPageCount(dbBackup) - (decimal)SQLite3.BackupRemaining(dbBackup)) / (decimal)SQLite3.BackupPageCount(dbBackup));
+
+                        if ( newProgress != oldProgress ) {
+                            //todo: report progress via events
+                            BackupProgressEventArgs progressArgs = new BackupProgressEventArgs(destinationFileName, newProgress);
+                            if (BackupProgress != null) {
+                                BackupProgress(this, progressArgs);
+                            }
+                        }
+
+                        oldProgress = newProgress;
+
+                        if (functionCode == SQLite3.Result.OK || functionCode == SQLite3.Result.Busy || functionCode == SQLite3.Result.Locked) {
+                            Thread.Sleep(250);
+                        }
+                    } while (functionCode == SQLite3.Result.OK || functionCode == SQLite3.Result.Busy || functionCode == SQLite3.Result.Locked);
+
+                    SQLite3.BackupFinish(dbBackup);
+                }
+
+            }
+
+            functionCode = SQLite3.Close(dbBackupHandle);
+
+            return functionCode;
+        }
+
 		
 		/// <summary>
 		/// Used to list some code that we want the MonoTouch linker
@@ -2693,6 +2771,7 @@ namespace SQLite
 		System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator ()
 		{
 			return GetEnumerator ();
+
 		}
 
 		public T First ()
@@ -2754,6 +2833,7 @@ namespace SQLite
 		[DllImport("sqlite3", EntryPoint = "sqlite3_open", CallingConvention=CallingConvention.Cdecl)]
 		public static extern Result Open ([MarshalAs(UnmanagedType.LPStr)] string filename, out IntPtr db);
 
+
 		[DllImport("sqlite3", EntryPoint = "sqlite3_open_v2", CallingConvention=CallingConvention.Cdecl)]
 		public static extern Result Open ([MarshalAs(UnmanagedType.LPStr)] string filename, out IntPtr db, int flags, IntPtr zvfs);
 		
@@ -2803,34 +2883,42 @@ namespace SQLite
         /// <param name="stmt"></param>
         /// <returns>Modified by TW</returns>
         /// 
-        internal static long stepCount = 0;
-        internal static IntPtr lastStep = IntPtr.Zero;
         public static Result Step(IntPtr stmt, uint SecondsTimeout = 1) {
             Result result;
-
-            if (stmt == lastStep) {
-                stepCount++;
-            } else {
-                Wolfje.Plugins.SEconomy.SEconomyPlugin.Profiler.Enter("sqlite3_step " + stmt);
-                lastStep = stmt;
-                stepCount = 0;
-            }
-            
-
             ulong wait = 0;
-            while ((result = sqlite3_step(stmt)) == Result.Busy && SecondsTimeout > 0 && (wait / 1000) <= SecondsTimeout) {
-                Thread.Sleep(10);
-                wait += 10;
-            }
+
+            do {
+                if ((result = sqlite3_step(stmt)) == Result.Busy) {
+                    Thread.Sleep(10);
+                    wait += 10;
+                }
+            } while (result == Result.Busy && (wait / 1000) <= SecondsTimeout);
 
             if (wait > 0) {
                 TShockAPI.Log.ConsoleError("SEconomy: db: sqlite3_step: busy lock for " + wait + "ms");
             }
 
-            Wolfje.Plugins.SEconomy.SEconomyPlugin.Profiler.ExitLog("sqlite3_step " + stmt);
-
             return result;
         }
+
+        //sqlite backup functions
+        [DllImport("sqlite3", EntryPoint = "sqlite3_backup_init", CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr BackupInit(IntPtr destinationDb, [MarshalAs(UnmanagedType.LPStr)] string destinationDbName, IntPtr sourceDb, [MarshalAs(UnmanagedType.LPStr)] string sourceDbName);
+
+        [DllImport("sqlite3", EntryPoint = "sqlite3_backup_step", CallingConvention = CallingConvention.Cdecl)]
+        public static extern Result BackupStep(IntPtr backupObject, int pageNumber);
+
+
+        [DllImport("sqlite3", EntryPoint = "sqlite3_backup_finish", CallingConvention = CallingConvention.Cdecl)]
+        public static extern Result BackupFinish(IntPtr backupObject);
+
+        [DllImport("sqlite3", EntryPoint = "sqlite3_backup_remaining", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BackupRemaining(IntPtr backupObject);
+
+
+        [DllImport("sqlite3", EntryPoint = "sqlite3_backup_pagecount", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int BackupPageCount(IntPtr backupObject);
+
 
 		[DllImport("sqlite3", EntryPoint = "sqlite3_reset", CallingConvention=CallingConvention.Cdecl)]
 		public static extern Result Reset (IntPtr stmt);

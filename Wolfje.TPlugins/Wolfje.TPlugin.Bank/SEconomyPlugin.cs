@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Reflection;
 
+using System.Xml.Linq;
+
 using Terraria;
 using TShockAPI;
 using System.Threading.Tasks;
@@ -18,16 +20,23 @@ namespace Wolfje.Plugins.SEconomy {
     /// </summary>
     [APIVersion(1, 12)]
     public class SEconomyPlugin : TerrariaPlugin {
-
-        public static DatabaseDriver Database;
+  
         internal static readonly Performance.Profiler Profiler = new Performance.Profiler();
         static List<Economy.EconomyPlayer> economyPlayers;
-        static Economy.BankAccount _worldBankAccount;
-        static readonly List<ModuleFramework.ModuleBase> modules = new List<ModuleFramework.ModuleBase>();
-        static Configuration Configuration { get; set; }
+        static Journal.XBankAccount _worldBankAccount;
+      
+        public static Configuration Configuration { get; private set; }
+
         static System.Timers.Timer PayRunTimer { get; set; }
-        static System.IO.FileSystemWatcher ConfigFileWatcher { get; set; }
-       
+        static System.Timers.Timer JournalBackupTimer { get; set; }
+
+        public static bool BackupCanRun { get; set; }
+
+        public static List<Economy.EconomyPlayer> EconomyPlayers {
+            get {
+                return economyPlayers;
+            }
+        }
 
         #region "API Plugin Stub"
         public override string Author {
@@ -58,8 +67,6 @@ namespace Wolfje.Plugins.SEconomy {
 
         #region "Constructors"
 
-        
-
         public SEconomyPlugin(Main game)
             : base(game) {
             Order = 20000;
@@ -67,19 +74,27 @@ namespace Wolfje.Plugins.SEconomy {
             if (!System.IO.Directory.Exists(Configuration.BaseDirectory)) {
                 System.IO.Directory.CreateDirectory(Configuration.BaseDirectory);
             }
-
+             
             economyPlayers = new List<Economy.EconomyPlayer>();
 
             TShockAPI.Hooks.PlayerHooks.PlayerLogin += PlayerHooks_PlayerLogin;
 
-            Hooks.GameHooks.Initialize += GameHooks_Initialize;
+            Hooks.GameHooks.PostInitialize += GameHooks_PostInitialize;
             Hooks.ServerHooks.Join += ServerHooks_Join;
             Hooks.ServerHooks.Leave += ServerHooks_Leave;
             Hooks.NetHooks.GetData += NetHooks_GetData;
 
             Economy.EconomyPlayer.PlayerBankAccountLoaded += EconomyPlayer_PlayerBankAccountLoaded;
-            Economy.BankAccount.BankAccountFlagsChanged += BankAccount_BankAccountFlagsChanged;
-            Economy.BankAccount.BankTransferCompleted += BankAccount_BankTransferCompleted;
+            Journal.XBankAccount.BankAccountFlagsChanged += BankAccount_BankAccountFlagsChanged;
+            Journal.XBankAccount.BankTransferCompleted += BankAccount_BankTransferCompleted;
+        }
+
+        /// <summary>
+        /// Destructor:  flush uncommitted transactions to disk before this object is cleaned up.
+        /// </summary>
+        ~SEconomyPlugin() {
+            Console.WriteLine("seconomy journal: emergency flushing journal to disk.");
+            Journal.TransactionJournal.SaveXml(Configuration.JournalPath);
         }
 
         /// <summary>
@@ -109,25 +124,20 @@ namespace Wolfje.Plugins.SEconomy {
             if (disposing) {
                 TShockAPI.Hooks.PlayerHooks.PlayerLogin -= PlayerHooks_PlayerLogin;
 
-                Hooks.GameHooks.Initialize -= GameHooks_Initialize;
                 Hooks.ServerHooks.Join -= ServerHooks_Join;
                 Hooks.NetHooks.GetData -= NetHooks_GetData;
                 Hooks.ServerHooks.Leave -= ServerHooks_Leave;
 
                 Economy.EconomyPlayer.PlayerBankAccountLoaded -= EconomyPlayer_PlayerBankAccountLoaded;
-                Economy.BankAccount.BankAccountFlagsChanged -= BankAccount_BankAccountFlagsChanged;
-                Economy.BankAccount.BankTransferCompleted -= BankAccount_BankTransferCompleted;
+                Journal.XBankAccount.BankAccountFlagsChanged -= BankAccount_BankAccountFlagsChanged;
+                Journal.XBankAccount.BankTransferCompleted -= BankAccount_BankTransferCompleted;
+                Hooks.GameHooks.PostInitialize -= GameHooks_PostInitialize;
+
+                Console.WriteLine("seconomy journal: emergency flushing journal to disk.");
+                Journal.TransactionJournal.SaveXml(Configuration.JournalPath);
 
                 economyPlayers = null;
-                Database = null;
 
-                TShockAPI.Log.ConsoleInfo("Turning off modules");
-
-                foreach (ModuleFramework.ModuleBase m in modules) {
-                    m.Dispose();
-                }
-
-                modules.Clear();
             }
 
             base.Dispose(disposing);
@@ -140,9 +150,50 @@ namespace Wolfje.Plugins.SEconomy {
         /// </summary>
         public override void Initialize() {
             Configuration = Configuration.LoadConfigurationFromFile(Configuration.BaseDirectory + System.IO.Path.DirectorySeparatorChar + "SEconomy.config.json");
+
+            try {
+                Journal.TransactionJournal.LoadFromXmlFile(Configuration.JournalPath);
+            } catch {
+                TShockAPI.Log.ConsoleError("SEconomy: xml initialization failed.");
+                throw;
+            }
+
+            //Initialize the command interface
+            ChatCommands.Initialize();
+
+            Log.ConsoleInfo(string.Format("seconomy xml: backing up journal every {0} minutes.", Configuration.JournalBackupMinutes));
+            JournalBackupTimer = new System.Timers.Timer(Configuration.JournalBackupMinutes * 60000);
+            JournalBackupTimer.Elapsed += JournalBackupTimer_Elapsed;
+            JournalBackupTimer.Start();
         }
 
+        
+
         #region "Event Handlers"
+
+        /// <summary>
+        /// Occurs when the transaction journal needs to be backed up.
+        /// </summary>
+        void JournalBackupTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e) {
+            if (BackupCanRun) {
+                Journal.TransactionJournal.BackupJournalAsync();
+            }
+        }
+
+        void GameHooks_PostInitialize() {
+
+            //this is the pay run timer.
+            //The timer event fires when it's time to do a pay run to the online players
+            //This event fires in PayRunTimer_Elapsed
+            if (Configuration.PayIntervalMinutes > 0) {
+                PayRunTimer = new System.Timers.Timer(Configuration.PayIntervalMinutes * 60000);
+                PayRunTimer.Elapsed += PayRunTimer_Elapsed;
+                PayRunTimer.Start();
+            }
+
+            WorldAccount = Journal.TransactionJournal.EnsureWorldAccountExists();
+        }
+
 
         /// <summary>
         /// Fires when a player's bank account is loaded from the database.
@@ -152,39 +203,38 @@ namespace Wolfje.Plugins.SEconomy {
 
             if (ePlayer.BankAccount != null) {
                 if (ePlayer.BankAccount.IsAccountEnabled) {
-                    ePlayer.TSPlayer.SendInfoMessage(string.Format("You have {0}", ePlayer.BankAccount.Money.ToLongString(true)));
+                    ePlayer.TSPlayer.SendInfoMessage(string.Format("You have {0}", ePlayer.BankAccount.Balance.ToLongString(true)));
                 } else {
                     ePlayer.TSPlayer.SendInfoMessage("Your bank account is disabled.");
                 }
             }
         }
 
-
         /// <summary>
         /// Occurs when a bank transfer completes.
         /// </summary>
-        void BankAccount_BankTransferCompleted(object sender, Economy.BankTransferEventArgs e) {
+        void BankAccount_BankTransferCompleted(object sender, Journal.BankTransferEventArgs e) {
             //this is pretty balls too, but will do for now.
 
-            if ((e.TransferOptions & Economy.BankAccountTransferOptions.SuppressDefaultAnnounceMessages) == Economy.BankAccountTransferOptions.SuppressDefaultAnnounceMessages) {
+            if ((e.TransferOptions & Journal.BankAccountTransferOptions.SuppressDefaultAnnounceMessages) == Journal.BankAccountTransferOptions.SuppressDefaultAnnounceMessages) {
                 return;
             } else if (e.ReceiverAccount != null) {
 
                 //Player died from PvP
-                if ((e.TransferOptions & Economy.BankAccountTransferOptions.MoneyFromPvP) == Economy.BankAccountTransferOptions.MoneyFromPvP) {
-                    if ((e.TransferOptions & Economy.BankAccountTransferOptions.AnnounceToReceiver) == Economy.BankAccountTransferOptions.AnnounceToReceiver) {
+                if ((e.TransferOptions & Journal.BankAccountTransferOptions.MoneyFromPvP) == Journal.BankAccountTransferOptions.MoneyFromPvP) {
+                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToReceiver) == Journal.BankAccountTransferOptions.AnnounceToReceiver) {
                         e.ReceiverAccount.Owner.TSPlayer.SendMessage(string.Format("You killed {0} and gained {1}.", e.SenderAccount.Owner.TSPlayer.Name, e.Amount.ToLongString()), Color.Orange);
                     }
-                    if ((e.TransferOptions & Economy.BankAccountTransferOptions.AnnounceToSender) == Economy.BankAccountTransferOptions.AnnounceToSender) {
+                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToSender) == Journal.BankAccountTransferOptions.AnnounceToSender) {
                         e.SenderAccount.Owner.TSPlayer.SendMessage(string.Format("{0} killed you and you lost {1}.", e.ReceiverAccount.Owner.TSPlayer.Name, e.Amount.ToLongString()), Color.Orange);
                     }
 
                     //P2P transfers, both the sender and the reciever get notified.
-                } else if ((e.TransferOptions & Economy.BankAccountTransferOptions.IsPlayerToPlayerTransfer) == Economy.BankAccountTransferOptions.IsPlayerToPlayerTransfer) {
-                    if ((e.TransferOptions & Economy.BankAccountTransferOptions.AnnounceToReceiver) == Economy.BankAccountTransferOptions.AnnounceToReceiver) {
+                } else if ((e.TransferOptions & Journal.BankAccountTransferOptions.IsPlayerToPlayerTransfer) == Journal.BankAccountTransferOptions.IsPlayerToPlayerTransfer) {
+                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToReceiver) == Journal.BankAccountTransferOptions.AnnounceToReceiver) {
                         e.ReceiverAccount.Owner.TSPlayer.SendMessage(string.Format("You received {0} from {1} Transaction # {2}", e.Amount.ToLongString(), e.SenderAccount.Owner.TSPlayer.Name, e.TransactionID), Color.Orange);
                     }
-                    if ((e.TransferOptions & Economy.BankAccountTransferOptions.AnnounceToSender) == Economy.BankAccountTransferOptions.AnnounceToSender) {
+                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToSender) == Journal.BankAccountTransferOptions.AnnounceToSender) {
                         e.SenderAccount.Owner.TSPlayer.SendMessage(string.Format("You sent {0} to {1}. Transaction # {2}", e.Amount.ToLongString(), e.ReceiverAccount.Owner.TSPlayer.Name, e.TransactionID), Color.Orange);
                     }
 
@@ -192,17 +242,17 @@ namespace Wolfje.Plugins.SEconomy {
                 } else {
                     string moneyVerb = "gained";
                     if (e.Amount < 0) {
-                        if ((e.TransferOptions & Economy.BankAccountTransferOptions.IsPayment) == Economy.BankAccountTransferOptions.IsPayment) {
+                        if ((e.TransferOptions & Journal.BankAccountTransferOptions.IsPayment) == Journal.BankAccountTransferOptions.IsPayment) {
                             moneyVerb = "paid";
                         } else {
                             moneyVerb = "lost";
                         }
                     }
 
-                    if ((e.TransferOptions & Economy.BankAccountTransferOptions.AnnounceToSender) == Economy.BankAccountTransferOptions.AnnounceToSender) {
+                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToSender) == Journal.BankAccountTransferOptions.AnnounceToSender) {
                         e.SenderAccount.Owner.TSPlayer.SendMessage(string.Format("You {0} {1}", moneyVerb, e.Amount.ToLongString()), Color.Orange);
                     }
-                    if ((e.TransferOptions & Economy.BankAccountTransferOptions.AnnounceToReceiver) == Economy.BankAccountTransferOptions.AnnounceToReceiver) {
+                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToReceiver) == Journal.BankAccountTransferOptions.AnnounceToReceiver) {
                         e.ReceiverAccount.Owner.TSPlayer.SendMessage(string.Format("You {0} {1}", moneyVerb, e.Amount.ToLongString()), Color.Orange);
                     }
                 }
@@ -214,17 +264,18 @@ namespace Wolfje.Plugins.SEconomy {
         /// <summary>
         /// Occurs when a player's bank account flags change
         /// </summary>
-        void BankAccount_BankAccountFlagsChanged(object sender, Economy.BankAccountChangedEventArgs e) {
-            Economy.BankAccount bankAccount = sender as Economy.BankAccount;
-            Economy.EconomyPlayer player = GetEconomyPlayerByBankAccountNameSafe(bankAccount.BankAccountName);
-            TSPlayer caller = TShock.Players[e.CallerID];
+        void BankAccount_BankAccountFlagsChanged(object sender, Journal.BankAccountChangedEventArgs e) {
+            Journal.XBankAccount bankAccount = sender as Journal.XBankAccount;
+            Economy.EconomyPlayer player = GetEconomyPlayerByBankAccountNameSafe(bankAccount.UserAccountName);
+
 
             //You can technically make payments to anyone even if they are offline.
             //This serves as a basic online check as we don't give a fuck about informing
             //an offline person that their account has been disabled or not.
             if (player != null) {
-                bool enabled = (e.NewFlags & DatabaseObjects.BankAccountFlags.Enabled) == DatabaseObjects.BankAccountFlags.Enabled;
+                bool enabled = (e.NewFlags & Journal.BankAccountFlags.Enabled) == Journal.BankAccountFlags.Enabled;
 
+                TSPlayer caller = TShock.Players[e.CallerID];
                 if (player.TSPlayer.Name == caller.Name) {
                     player.TSPlayer.SendInfoMessageFormat("bank: Your bank account has been {0}d.", enabled ? "enable" : "disable");
                 } else {
@@ -259,11 +310,10 @@ namespace Wolfje.Plugins.SEconomy {
                 //if the user belongs to group superadmin we can assume they are trusted and attempt to load a bank account via name.
                 //everyone else has to login
                 if (player.TSPlayer.Group is TShockAPI.SuperAdminGroup) {
-                    player.LoadBankAccountByPlayerNameAsync();
+                    //player.LoadBankAccountByPlayerNameAsync();
                 }
             }
             
-            Task shuttingTheCompilerWarningUp = Database.EnsureWorldAccountExistsAsync();
         }
 
         /// <summary>
@@ -276,56 +326,6 @@ namespace Wolfje.Plugins.SEconomy {
             ePlayer.EnsureBankAccountExists();
         }
 
-        /// <summary>
-        /// Fires when the server initializes.
-        /// </summary>
-        void GameHooks_Initialize() {
-            Database = new DatabaseDriver(Configuration.DatabaseFilePath);
-
-            Log.ConsoleInfo("seconomy modules: Turning on modules");
-
-            modules.AddRange(Modules.ModuleLoader.LoadModules(Configuration.Modules));
-            foreach (ModuleFramework.ModuleBase loadedModule in modules) {
-                Log.ConsoleInfo(string.Format("seconomy modules: {0} v{1} by {2} loaded.", loadedModule.Name, loadedModule.Version, loadedModule.Author));
-                //init the module.
-                loadedModule.Initialize();
-            }
-
-            //Initialize the command interface
-            ChatCommands.Initialize();
-
-            ConfigFileWatcher = new System.IO.FileSystemWatcher(System.IO.Path.Combine(Environment.CurrentDirectory, Configuration.BaseDirectory));
-            ConfigFileWatcher.Changed += ConfigFileWatcher_Changed;
-            ConfigFileWatcher.NotifyFilter = System.IO.NotifyFilters.LastAccess | System.IO.NotifyFilters.LastWrite | System.IO.NotifyFilters.DirectoryName;
-            ConfigFileWatcher.EnableRaisingEvents = true;
-
-            //this is the pay run timer.
-            //The timer event fires when it's time to do a pay run to the online players
-            //This event fires in PayRunTimer_Elapsed
-            if (Configuration.PayIntervalMinutes > 0) {
-                PayRunTimer = new System.Timers.Timer(Configuration.PayIntervalMinutes * 60000);
-                PayRunTimer.Elapsed += PayRunTimer_Elapsed;
-                PayRunTimer.Start();
-            }
-        }
-
-        /// <summary>
-        /// Occurs when a file changes in the tshock directory.  Used to determine when modules' config files change.
-        /// </summary>
-        void ConfigFileWatcher_Changed(object sender, System.IO.FileSystemEventArgs e) {
-
-            try {
-                ConfigFileWatcher.EnableRaisingEvents = false;
-
-                foreach (ModuleFramework.ModuleBase loadedModule in modules) {
-                    if (System.IO.Path.GetFileName(e.Name).Equals(System.IO.Path.GetFileName(loadedModule.ConfigFilePath), StringComparison.CurrentCultureIgnoreCase)) {
-                        loadedModule.OnConfigFileChanged();
-                    }
-                }
-            } finally {
-                ConfigFileWatcher.EnableRaisingEvents = true;
-            }
-        }
 
         /// <summary>
         /// Occurs when a player online payment needs to occur.
@@ -342,7 +342,8 @@ namespace Wolfje.Plugins.SEconomy {
                             //then the player is considered not AFK.
                             if (ep.TimeSinceIdle.TotalMinutes <= Configuration.IdleThresholdMinutes && ep.BankAccount != null) {
                                 //Pay them from the world account
-                                WorldAccount.TransferAndReturn(ep.BankAccount, payAmount, Economy.BankAccountTransferOptions.AnnounceToReceiver);
+                                WorldAccount.TransferToAsync(ep.BankAccount, payAmount, Journal.BankAccountTransferOptions.AnnounceToReceiver);
+                                //WorldAccount.TransferAndReturn(ep.BankAccount, payAmount, Economy.BankAccountTransferOptions.AnnounceToReceiver);
                             }
                         }
                     }
@@ -360,7 +361,7 @@ namespace Wolfje.Plugins.SEconomy {
         static object __accountSafeLock = new object();
         public static Economy.EconomyPlayer GetEconomyPlayerByBankAccountNameSafe(string Name) {
             lock (__accountSafeLock) {
-                return economyPlayers.FirstOrDefault(i => (i.BankAccount != null) && i.BankAccount.BankAccountName == Name);
+                return economyPlayers.FirstOrDefault(i => (i.BankAccount != null) && i.BankAccount.UserAccountName == Name);
             }
         }
 
@@ -393,7 +394,7 @@ namespace Wolfje.Plugins.SEconomy {
         /// <summary>
         /// Gets the world bank account (system account) for paying players.
         /// </summary>
-        public static Economy.BankAccount WorldAccount {
+        public static Journal.XBankAccount WorldAccount {
             get {
                 return _worldBankAccount;
             }
@@ -402,22 +403,54 @@ namespace Wolfje.Plugins.SEconomy {
                 _worldBankAccount = value;
 
                 if (_worldBankAccount != null) {
-
                     _worldBankAccount.SyncBalanceAsync().ContinueWith((task) => {
-                        long worldAccountBalance = _worldBankAccount.Money;
-                        if (worldAccountBalance < 0) {
-                            worldAccountBalance *= -1;
-                        }
-
-                        Log.ConsoleInfo(string.Format("SEconomy: world account: paid {0} to players.", ((Money)worldAccountBalance).ToLongString()));
+                        Log.ConsoleInfo(string.Format("SEconomy: world account: paid {0} to players.", _worldBankAccount.Balance.ToLongString()));
                     });
-
                 }
             }
         }
 
 
         #endregion
+
+
+        /// <summary>
+        /// Reflects on a private method.  Can remove this if TShock opens up a bit more of their API publicly
+        /// </summary>
+        public static T CallPrivateMethod<T>(Type type, bool staticMember, string name, params object[] param) {
+            BindingFlags flags = BindingFlags.NonPublic;
+            if (staticMember) {
+                flags |= BindingFlags.Static;
+            } else {
+                flags |= BindingFlags.Instance;
+            }
+            MethodInfo method = type.GetMethod(name, flags);
+            return (T)method.Invoke(staticMember ? null : type, param);
+        }
+
+        /// <summary>
+        /// Reflects on a private instance member of a class.  Can remove this if TShock opens up a bit more of their API publicly
+        /// </summary>
+        public static T GetPrivateField<T>(Type type, object instance, string name, params object[] param) {
+            BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+
+            FieldInfo field = type.GetField(name, flags) as FieldInfo;
+
+            return (T)field.GetValue(instance);
+        }
+
+        public static void FillWithSpaces(ref string Input) {
+            int i = Input.Length;
+            StringBuilder sb = new StringBuilder(Input);
+
+            do {
+                sb.Append(" ");
+                i++;
+            } while (i < Console.WindowWidth - 1);
+
+            Input = sb.ToString();
+        }
+
 
     }
 }

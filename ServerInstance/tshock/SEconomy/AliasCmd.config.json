@@ -13,7 +13,7 @@
       "CooldownSeconds": 0
     },
     {
-      "CommandAlias": "testrandm",
+      "CommandAlias": "testrandom",
       "CommandsToExecute": [
         "/bc Random Number: $random(1,100)"
       ],
@@ -23,12 +23,12 @@
       "CooldownSeconds": 0
     },
     {
-      "CommandAlias": "imp",
+      "CommandAlias": "impersonate",
       "CommandsToExecute": [
-        "$runas($1,$2-)"
+        "$runas($1,/me can fit $random(1,100) cocks in their mouth at once.)"
       ],
       "Cost": "0c",
-      "Permissions": "superadmin",
+      "Permissions": "",
       "UsageHelpText": "",
       "CooldownSeconds": 0
     }

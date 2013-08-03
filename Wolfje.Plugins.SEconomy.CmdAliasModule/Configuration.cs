@@ -5,21 +5,10 @@ using System.Text;
 
 using Newtonsoft.Json;
 
-namespace Wolfje.Plugins.SEconomy {
+namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
     public class Configuration {
 
-        public bool BankAccountsEnabled = true;
-        public string StartingMoney = "0";
-
-        public int PayIntervalMinutes = 30;
-        public int IdleThresholdMinutes = 10;
-        public string IntervalPayAmount = "0";
-        public static string BaseDirectory = @"tshock" + System.IO.Path.DirectorySeparatorChar + "SEconomy";
-        public static string JournalPath = BaseDirectory + System.IO.Path.DirectorySeparatorChar + "SEconomy.journal.xml.gz";
-
-        public static int JournalBackupMinutes = 1;
-
-        public static bool EnableProfiler = false;
+        public List<AliasCommand> CommandAliases = new List<AliasCommand>();
 
         /// <summary>
         /// Loads a configuration file and deserializes it from JSON
@@ -34,16 +23,16 @@ namespace Wolfje.Plugins.SEconomy {
 
             } catch (Exception ex) {
                 if (ex is System.IO.FileNotFoundException || ex is System.IO.DirectoryNotFoundException) {
-                    TShockAPI.Log.ConsoleError("seconomy configuration: Cannot find file or directory. Creating new one.");
+                    TShockAPI.Log.ConsoleError("cmdalias configuration: Cannot find file or directory. Creating new one.");
 
                     config = Configuration.NewSampleConfiguration();
 
                     config.SaveConfiguration(Path);
 
                 } else if (ex is System.Security.SecurityException) {
-                    TShockAPI.Log.ConsoleError("seconomy configuration: Access denied reading file " + Path);
+                    TShockAPI.Log.ConsoleError("cmdalias configuration: Access denied reading file " + Path);
                 } else {
-                    TShockAPI.Log.ConsoleError("seconomy configuration: error " + ex.ToString());
+                    TShockAPI.Log.ConsoleError("cmdalias configuration: error " + ex.ToString());
                 }
             }
 
@@ -53,25 +42,36 @@ namespace Wolfje.Plugins.SEconomy {
         public static Configuration NewSampleConfiguration() {
             Configuration newConfig = new Configuration();
 
+            newConfig.CommandAliases.Add(AliasCommand.Create("testparms", "", "0c", "", 0, "/bc Input param 1 2 3: $1 $2 $3", "/bc Input param 1-3: $1-3", "/bc Input param 2 to end of line: $2-"));
+            newConfig.CommandAliases.Add(AliasCommand.Create("testrandom", "", "0c", "", 0, "/bc Random Number: $random(1,100)"));
+            newConfig.CommandAliases.Add(AliasCommand.Create("impersonate", "", "0c", "", 0, "$runas($1,/me can fit $random(1,100) cocks in their mouth at once.)"));
+
             return newConfig;
         }
 
         public void SaveConfiguration(string Path) {
+
             try {
                 string config = JsonConvert.SerializeObject(this, Formatting.Indented);
+
                 System.IO.File.WriteAllText(Path, config);
+
             } catch (Exception ex) {
 
                 if (ex is System.IO.DirectoryNotFoundException) {
-                    TShockAPI.Log.ConsoleError("vault config: save directory not found: " + Path);
+                    TShockAPI.Log.ConsoleError("cmdalias config: save directory not found: " + Path);
 
                 } else if (ex is UnauthorizedAccessException || ex is System.Security.SecurityException) {
-                    TShockAPI.Log.ConsoleError("vault config: Access is denied to Vault config: " + Path);
+                    TShockAPI.Log.ConsoleError("cmdalias config: Access is denied to Vault config: " + Path);
                 } else {
-                    TShockAPI.Log.ConsoleError("vault config: Error reading file: " + Path);
+                    TShockAPI.Log.ConsoleError("cmdalias config: Error reading file: " + Path);
                     throw;
                 }
             }
+
         }
+
     }
+
+ 
 }

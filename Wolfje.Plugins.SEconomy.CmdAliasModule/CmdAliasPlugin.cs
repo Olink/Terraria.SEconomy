@@ -6,22 +6,23 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 
 using Wolfje.Plugins.SEconomy;
-using Wolfje.Plugins.SEconomy.ModuleFramework;
 using System.Threading.Tasks;
 
 
 
-namespace Wolfje.Plugins.SEconomy.Modules.CmdAlias {
+namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
 
     /// <summary>
     /// Provides command aliases that can cost money to execute in SEconomy.
     /// </summary>
-    [SEconomyModule]
-    public class CmdAliasPlugin : ModuleBase {
+    [APIVersion(1,12)]
+    public class CmdAliasPlugin : TerrariaPlugin {
 
         static Configuration Configuration { get; set; }
 
         #region "API stub"
+
+        public CmdAliasPlugin(Terraria.Main game) : base(game) { }
 
         public override string Author {
             get {
@@ -61,33 +62,45 @@ namespace Wolfje.Plugins.SEconomy.Modules.CmdAlias {
         /// </summary>
         static readonly Dictionary<KeyValuePair<string, AliasCommand>, DateTime> CooldownList = new Dictionary<KeyValuePair<string, AliasCommand>, DateTime>();
 
-        public override void Initialize() {
-            base.ConfigFileChanged += CmdAliasPlugin_ConfigFileChanged;
+        public override void Initialize()  {
 
-            Configuration = Configuration.LoadConfigurationFromFile(this.ConfigFilePath);
+            TShockAPI.Commands.ChatCommands.Add(new TShockAPI.Command("aliascmd", ChatCommand_GeneralCommand, "aliascmd") { AllowServer = true });
+
+
+            Configuration = Configuration.LoadConfigurationFromFile("tshock" + System.IO.Path.DirectorySeparatorChar + "SEconomy" + System.IO.Path.DirectorySeparatorChar + "AliasCmd.config.json");
             ParseCommands();
+        }
 
-            base.Initialize();
+        private void ChatCommand_GeneralCommand(TShockAPI.CommandArgs args) {
+
+            if (args.Parameters.Count >= 1 && args.Parameters[0].Equals("reload", StringComparison.CurrentCultureIgnoreCase)) {
+                ReloadConfigAfterDelay(5);
+            } else {
+                args.Player.SendErrorMessageFormat("aliascmd: usage: /aliascmd reload: reloads the AliasCmd configuration file.");
+            }
+
         }
 
        void ReloadConfigAfterDelay(int DelaySeconds) {
 
-            Task.Factory.StartNew(() => {
-                System.Threading.Thread.Sleep(5000);
-                
-            TShockAPI.Log.ConsoleInfo("AliasCmd: reloading config.");
+           Task.Factory.StartNew(() => {
+               System.Threading.Thread.Sleep(5000);
 
-            try {           
-                Configuration reloadedConfig = Configuration.LoadConfigurationFromFile(this.ConfigFilePath);
-                Configuration = reloadedConfig;
-                ParseCommands();
-            } catch (Exception ex) {
-                TShockAPI.Log.ConsoleError("aliascmd: Your new config could not be loaded, fix any problems and save the file.  Your old configuration is in effect until this is fixed. \r\n\r\n" + ex.ToString());
-            }
+               TShockAPI.Log.ConsoleInfo("AliasCmd: reloading config.");
 
-            TShockAPI.Log.ConsoleInfo("AliasCmd: config reload done.");
+               try {
+                   Configuration reloadedConfig = Configuration.LoadConfigurationFromFile("tshock" + System.IO.Path.DirectorySeparatorChar + "SEconomy" + System.IO.Path.DirectorySeparatorChar + "AliasCmd.config.json");
+                   Configuration = reloadedConfig;
 
-            });
+                   ParseCommands();
+
+               } catch (Exception ex) {
+                   TShockAPI.Log.ConsoleError("aliascmd: Your new config could not be loaded, fix any problems and save the file.  Your old configuration is in effect until this is fixed. \r\n\r\n" + ex.ToString());
+               }
+
+               TShockAPI.Log.ConsoleInfo("AliasCmd: config reload done.");
+
+           });
 
         }
 
@@ -301,7 +314,7 @@ namespace Wolfje.Plugins.SEconomy.Modules.CmdAlias {
                                 } else if (ePlayer.BankAccount.Balance >= commandCost) {
 
                                     //Take money off the player, and indicate that this is a payment for something tangible.
-                                    Journal.BankTransferEventArgs trans = SEconomyPlugin.WorldAccount.TransferTo(ePlayer.BankAccount, -commandCost, Journal.BankAccountTransferOptions.AnnounceToReceiver | Journal.BankAccountTransferOptions.IsPayment);
+                                    Journal.BankTransferEventArgs trans = SEconomyPlugin.WorldAccount.TransferTo(ePlayer.BankAccount, -commandCost, Journal.BankAccountTransferOptions.AnnounceToReceiver | Journal.BankAccountTransferOptions.IsPayment, Message: string.Format("AC: {0} cmd {1}", ePlayer.TSPlayer.Name, alias.CommandAlias));
                                     if (trans.TransferSucceeded) {
                                         DoCommands(alias, ePlayer.TSPlayer, e.Parameters);
                                     } else {
@@ -343,7 +356,7 @@ namespace Wolfje.Plugins.SEconomy.Modules.CmdAlias {
 
             string cmdText = text.Remove(0, 1);
 
-            var args = CallPrivateMethod<List<string>>(typeof(TShockAPI.Commands), true, "ParseParameters", cmdText);
+            var args = SEconomyPlugin.CallPrivateMethod<List<string>>(typeof(TShockAPI.Commands), true, "ParseParameters", cmdText);
 
             if (args.Count < 1)
                 return false;
@@ -373,31 +386,6 @@ namespace Wolfje.Plugins.SEconomy.Modules.CmdAlias {
                 }
             }
             return true;
-        }
-
-        /// <summary>
-        /// Reflects on a private method.  Can remove this if TShock opens up a bit more of their API publicly
-        /// </summary>
-       public static T CallPrivateMethod<T>(Type type, bool staticMember, string name, params object[] param) {
-            BindingFlags flags = BindingFlags.NonPublic;
-            if (staticMember) {
-                flags |= BindingFlags.Static;
-            } else {
-                flags |= BindingFlags.Instance;
-            }
-            MethodInfo method = type.GetMethod(name, flags);
-            return (T)method.Invoke(staticMember ? null : type, param);
-        }
-
-        /// <summary>
-        /// Reflects on a private instance member of a class.  Can remove this if TShock opens up a bit more of their API publicly
-        /// </summary>
-        public static T GetPrivateField<T>(Type type, object instance, string name, params object[] param) {
-            BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
-            
-            FieldInfo field = type.GetField(name, flags) as FieldInfo;
-
-            return (T)field.GetValue(instance);
         }
 
 

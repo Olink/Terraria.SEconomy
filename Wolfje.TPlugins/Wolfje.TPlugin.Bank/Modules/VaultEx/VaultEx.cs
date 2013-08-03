@@ -23,11 +23,6 @@ namespace Wolfje.Plugins.SEconomy.Modules.VaultEx {
 
         public VaultEx() { }
 
-        //public VaultEx(SEconomyPlugin plugin)
-        //    : base(plugin) {
-
-        //}
-
         #region "API Plugin Stub"
         public override string Author {
             get {
@@ -55,8 +50,6 @@ namespace Wolfje.Plugins.SEconomy.Modules.VaultEx {
 
         #endregion
 
-
-
         public override void Initialize() {
 
             PlayerList = new List<VaultPlayer>();
@@ -80,10 +73,6 @@ namespace Wolfje.Plugins.SEconomy.Modules.VaultEx {
             base.Dispose(disposing);
         }
 
-        void EconomyPlayer_PlayerBankAccountLoaded(object sender, EventArgs e) {
-            SEconomy.Economy.BankAccount ba = sender as SEconomy.Economy.BankAccount;
-            Console.WriteLine(ba.Owner.TSPlayer.Name);
-        }
 
         void ServerHooks_Join(int who, System.ComponentModel.HandledEventArgs arg2) {
             PlayerList.Add(new VaultPlayer(who));
@@ -114,13 +103,14 @@ namespace Wolfje.Plugins.SEconomy.Modules.VaultEx {
                                             SEconomy.Economy.EconomyPlayer ePlayer = SEconomyPlugin.GetEconomyPlayerSafe(reward.Key);
                                             if (ePlayer != null) {
                                                 //Pay from the world account to the reward recipient.
-                                                Economy.BankAccountTransferOptions options = Economy.BankAccountTransferOptions.None;
+                                                Journal.BankAccountTransferOptions options = Journal.BankAccountTransferOptions.None;
 
                                                 if (Config.AnnounceBossGain) {
-                                                    options |= Economy.BankAccountTransferOptions.AnnounceToReceiver;
+                                                    options |= Journal.BankAccountTransferOptions.AnnounceToReceiver;
                                                 }
 
-                                                SEconomyPlugin.WorldAccount.TransferAndReturn(ePlayer.BankAccount, reward.Value, options);
+                                                SEconomyPlugin.WorldAccount.TransferTo(ePlayer.BankAccount, reward.Value, options);
+
                                             }
                                         }
 
@@ -165,15 +155,13 @@ namespace Wolfje.Plugins.SEconomy.Modules.VaultEx {
                                 int i = player.TSPlayer.Index;
 
                                 SEconomy.Economy.EconomyPlayer epl = SEconomyPlugin.GetEconomyPlayerSafe(i);
-                                Economy.BankAccountTransferOptions options = Economy.BankAccountTransferOptions.None;
+                                Journal.BankAccountTransferOptions options = Journal.BankAccountTransferOptions.None;
 
                                 if (Config.AnnounceKillGain) {
-                                    options |= Economy.BankAccountTransferOptions.AnnounceToReceiver;
+                                    options |= Journal.BankAccountTransferOptions.AnnounceToReceiver;
                                 }
 
-                                Task shuttingTheCompilerWarningUp = SEconomyPlugin.WorldAccount.TransferToPlayerAsync(i, rewardAmt, options);
-
-                                // player.ChangeMoney(rewardAmt, MoneyEventFlags.Kill, config.AnnounceKillGain);
+                                SEconomyPlugin.WorldAccount.TransferTo(i, rewardAmt, options); 
                             }
                             player.AddKill(npc.netID);
                         }
@@ -191,7 +179,7 @@ namespace Wolfje.Plugins.SEconomy.Modules.VaultEx {
                     if (Config.StaticDeathPenalty) {
                         penaltyAmmount = _r.Next(Config.DeathPenaltyMin, Config.DeathPenaltyMax);
                     } else if ( eDeadPlayer.BankAccount != null )  {
-                        penaltyAmmount = (long)(eDeadPlayer.BankAccount.Money * (Config.DeathPenaltyPercent / 100f));
+                        penaltyAmmount = (long)(eDeadPlayer.BankAccount.Balance * (Config.DeathPenaltyPercent / 100f));
                     }
 
                     //   Console.WriteLine("penalty ammount: {0}", penaltyAmmount);
@@ -201,20 +189,20 @@ namespace Wolfje.Plugins.SEconomy.Modules.VaultEx {
                             Economy.EconomyPlayer eKiller = SEconomyPlugin.GetEconomyPlayerSafe(deadPlayer.LastPVPID);
                             
                             if (eKiller != null && eKiller.BankAccount != null) {
-                                Economy.BankAccountTransferOptions options = Economy.BankAccountTransferOptions.MoneyFromPvP | Economy.BankAccountTransferOptions.AnnounceToReceiver | Economy.BankAccountTransferOptions.AnnounceToSender;
+                                Journal.BankAccountTransferOptions options = Journal.BankAccountTransferOptions.MoneyFromPvP | Journal.BankAccountTransferOptions.AnnounceToReceiver | Journal.BankAccountTransferOptions.AnnounceToSender;
 
                               //  killer.ChangeMoney(penaltyAmmount, MoneyEventFlags.PvP, true);
 
                                 //Here in PVP the loser pays the winner money out of their account.
-                                Task shuttingTheCompilerWarningUp = eDeadPlayer.BankAccount.TransferToPlayerAsync(deadPlayer.LastPVPID, penaltyAmmount, options);
+                                eDeadPlayer.BankAccount.TransferTo(deadPlayer.LastPVPID, penaltyAmmount, options);
                             }
                         }
                     } else if (!deadPlayer.TSPlayer.Group.HasPermission("vault.bypass.death")) {
-                        Economy.BankAccountTransferOptions options = Economy.BankAccountTransferOptions.MoneyFromPvP | Economy.BankAccountTransferOptions.AnnounceToReceiver | Economy.BankAccountTransferOptions.AnnounceToSender;
+                        Journal.BankAccountTransferOptions options = Journal.BankAccountTransferOptions.MoneyFromPvP | Journal.BankAccountTransferOptions.AnnounceToReceiver | Journal.BankAccountTransferOptions.AnnounceToSender;
 
                        // deadPlayer.ChangeMoney(-penaltyAmmount, MoneyEventFlags.Death, true);
 
-                        Task shuttingTheCompilerWarningUp = SEconomyPlugin.WorldAccount.TransferToPlayerAsync(deadPlayer.Index, -penaltyAmmount, options);
+                        SEconomyPlugin.WorldAccount.TransferTo(deadPlayer.Index, -penaltyAmmount, options);
                     }
                 }
             } else if (e.MsgID == PacketTypes.PlayerDamage) {

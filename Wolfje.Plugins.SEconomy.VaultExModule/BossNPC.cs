@@ -11,6 +11,8 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
         public NPC Npc;
         public Dictionary<int, long> damageData = new Dictionary<int, long>();
 
+        public static readonly object __lock = new object();
+
         public int modifiedHealth;
 
         public BossNPC(NPC npc) {
@@ -19,33 +21,37 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
         }
 
         public void AddDamage(int playerID, int damage) {
-            if (damageData.ContainsKey(playerID))
-                damageData[playerID] += damage;
-            else
-                damageData.Add(playerID, damage);
+            lock (__lock) {
+               if (damageData.ContainsKey(playerID))
+                    damageData[playerID] += damage;
+                else
+                    damageData.Add(playerID, damage);
+            }
         }
 
         public Dictionary<int, long> GetRecalculatedReward() {
             long totalDmg = 0;
 
-            foreach (var v in damageData.Values) {
-                totalDmg += v;
+            lock (__lock) {
+                foreach (var v in damageData.Values) {
+                    totalDmg += v;
+                }
+
+                float valueMod = ((float)totalDmg / (float)modifiedHealth) <= 1 ? ((float)totalDmg / (float)modifiedHealth) : 1;
+                float newValue = ((float)modifiedHealth * valueMod) * VaultEx.Config.BossRewardModifier;
+                float valuePerDmg = (float)newValue / (float)totalDmg;
+
+                float Mod = 1;
+                //    if (Vault.config.OptionalMobModifier.ContainsKey(Npc.netID))
+                //      Mod *= Vault.config.OptionalMobModifier[Npc.netID]; // apply custom modifiers      
+                Dictionary<int, long> returnDict = new Dictionary<int, long>();
+
+                foreach (KeyValuePair<int, long> kv in damageData) {
+                    returnDict[kv.Key] = (long)(kv.Value * valuePerDmg * Mod);
+
+                }
+                return returnDict;
             }
-
-            float valueMod = ((float)totalDmg / (float)modifiedHealth) <= 1 ? ((float)totalDmg / (float)modifiedHealth) : 1;
-            float newValue = (float)(modifiedHealth * 100) * valueMod;
-            float valuePerDmg = (float)newValue / (float)totalDmg;
-            
-            float Mod = 1;
-        //    if (Vault.config.OptionalMobModifier.ContainsKey(Npc.netID))
-          //      Mod *= Vault.config.OptionalMobModifier[Npc.netID]; // apply custom modifiers      
-            Dictionary<int, long> returnDict = new Dictionary<int, long>();
-
-            foreach (KeyValuePair<int, long> kv in damageData) {
-                returnDict[kv.Key] = (long)(kv.Value * valuePerDmg * Mod);
-
-            }
-            return returnDict;
         }
 
     }

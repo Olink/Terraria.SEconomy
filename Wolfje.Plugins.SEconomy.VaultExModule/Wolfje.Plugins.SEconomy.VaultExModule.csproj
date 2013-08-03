@@ -30,6 +30,24 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+    <OutputPath>bin\x86\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="HttpServer">
       <HintPath>..\BuildReferences\TShock\HttpServer.dll</HintPath>
@@ -70,10 +88,6 @@
     <Compile Include="VaultPlayer.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Wolfje.Plugins.SEconomy.ModuleFramework\Wolfje.Plugins.SEconomy.ModuleFramework.csproj">
-      <Project>{0b0b8622-1c54-47a6-81b6-596058dce125}</Project>
-      <Name>Wolfje.Plugins.SEconomy.ModuleFramework</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Wolfje.TPlugins\Wolfje.TPlugin.Bank\Wolfje.Plugins.SEconomy.csproj">
       <Project>{27dd3a5c-b30a-4f00-8a3a-e178f7e3f7e5}</Project>
       <Name>Wolfje.Plugins.SEconomy</Name>

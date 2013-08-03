@@ -15,6 +15,7 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
 
         public Dictionary<int, int> KillData { get; set; }
 
+        
         public int Index { get; set; }
 
          public TShockAPI.TSPlayer TSPlayer {
@@ -27,6 +28,7 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
             this.KillData = new Dictionary<int, int>();
             this.Index = index;
         }
+
 
         public void AddKill(int mobID) {
             if (KillData.ContainsKey(mobID))

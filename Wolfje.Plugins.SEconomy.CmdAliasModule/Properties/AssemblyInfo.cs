@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("Wolfje.Plugins.SEconomy")]
-[assembly: AssemblyDescription("A server-side implementation of currency, with a drop-in replacement for Vault")]
+[assembly: AssemblyTitle("Wolfje.Plugins.SEconomy.CmdAliasModule")]
+[assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Some shizzle for the internizzle")]
-[assembly: AssemblyProduct("Wolfje.Plugins.SEconomy")]
-[assembly: AssemblyCopyright("Copyright © Tyler Watson 2013")]
+[assembly: AssemblyCompany("")]
+[assembly: AssemblyProduct("Wolfje.Plugins.SEconomy.CmdAliasModule")]
+[assembly: AssemblyCopyright("Copyright ©  2013")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -20,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("c19500b9-5b33-4a38-9d67-a2d95f5f9560")]
+[assembly: Guid("636fbe7f-e400-4bff-9199-7f70e2da2f8d")]
 
 // Version information for an assembly consists of the following four values:
 //
@@ -32,5 +32,5 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers 
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("0.1.2.0")]
-[assembly: AssemblyFileVersion("0.1.2.0")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]

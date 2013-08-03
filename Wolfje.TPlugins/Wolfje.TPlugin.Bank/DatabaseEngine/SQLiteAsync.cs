@@ -208,25 +208,6 @@ namespace SQLite
 			});
 		}
 
-        [Obsolete("Will cause a deadlock if any call in action ends up in a different thread. Use RunInTransactionAsync(Action<SQLiteConnection>) instead.")]
-		public Task RunInTransactionAsync (Action<SQLiteAsyncConnection> action)
-		{
-			return Task.Factory.StartNew (() => {
-				var conn = this.GetConnection ();
-				using (conn.Lock ()) {
-					conn.BeginTransaction ();
-					try {
-						action (this);
-						conn.Commit ();
-					}
-					catch (Exception) {
-						conn.Rollback ();
-						throw;
-					}
-				}
-			});
-		}
-
         public Task RunInTransactionAsync(Action<SQLiteConnection> action)
         {
             return Task.Factory.StartNew(() =>
@@ -281,6 +262,27 @@ namespace SQLite
 				}
 			});
 		}
+
+        public Task<SQLite3.Result> BackupToFileAsync(string backupFileName) {
+            return Task.Factory.StartNew<SQLite3.Result>(() => {
+                var conn = GetConnection();
+                using (conn.Lock()) {
+                    return conn.BackupDatabaseToFile(conn.Handle, "main", backupFileName);
+                }
+            });
+        }
+
+        public Task<SQLite3.Result> ImportFromFileAsync(string backupFileName) {
+            return Task.Factory.StartNew(() => {
+                var conn = GetConnection();
+
+                using (conn.Lock()) {
+                    return conn.LoadFromFile(backupFileName);
+                }
+
+            });
+        }
+
 	}
 
 	//
@@ -416,17 +418,17 @@ namespace SQLite
 
 		public SQLiteConnectionWithLock GetConnection (SQLiteConnectionString connectionString)
 		{
-			lock (_entriesLock) {
-				Entry entry;
-				string key = connectionString.ConnectionString;
+            lock (_entriesLock) {
+                Entry entry;
+                string key = connectionString.ConnectionString;
 
-				if (!_entries.TryGetValue (key, out entry)) {
-					entry = new Entry (connectionString);
-					_entries[key] = entry;
-				}
+                if (!_entries.TryGetValue(key, out entry)) {
+                    entry = new Entry(connectionString);
+                    _entries[key] = entry;
+                }
 
-				return entry.Connection;
-			}
+                return entry.Connection;
+            }
 		}
 
 		/// <summary>
@@ -434,12 +436,12 @@ namespace SQLite
 		/// </summary>
 		public void Reset ()
 		{
-			lock (_entriesLock) {
-				foreach (var entry in _entries.Values) {
-					entry.OnApplicationSuspended ();
-				}
-				_entries.Clear ();
-			}
+            lock (_entriesLock) {
+                foreach (var entry in _entries.Values) {
+                    entry.OnApplicationSuspended();
+                }
+                _entries.Clear();
+            }
 		}
 
 		/// <summary>
@@ -468,18 +470,16 @@ namespace SQLite
 
 		private class LockWrapper : IDisposable
 		{
-			object _lockPoint;
+            object _lockPoint;
 
-			public LockWrapper (object lockPoint)
-			{
-				_lockPoint = lockPoint;
-				Monitor.Enter (_lockPoint);
-			}
+            public LockWrapper(object lockPoint) {
+                _lockPoint = lockPoint;
+                Monitor.Enter(_lockPoint);
+            }
 
-			public void Dispose ()
-			{
-				Monitor.Exit (_lockPoint);
-			}
+            public void Dispose() {
+                Monitor.Exit(_lockPoint);
+            }
 		}
 	}
 }

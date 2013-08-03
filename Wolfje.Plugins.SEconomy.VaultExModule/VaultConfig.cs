@@ -10,14 +10,8 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
 
     public class VaultConfig {
 
-        public int InitialMoney = 0;
         public float BattlePotionModifier = 0.75f;
         public Dictionary<int, float> OptionalMobModifier = new Dictionary<int, float>();
-        public bool GiveTimedPay = true;
-        public int PayEveryMinutes = 10;
-        public byte MaxIdleTime = 3;
-        public int Payamount = 5000;
-        public bool AnnounceTimedPay = false;
         public bool AnnounceKillGain = false;
         public bool AnnounceBossGain = true;
         public bool StaticDeathPenalty = false;
@@ -25,6 +19,7 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
         public int DeathPenaltyMin = 10000;
         public int DeathPenaltyPercent = 10;
         public bool PvPWinnerTakesLoosersPenalty = true;
+        public float BossRewardModifier = 1.0f;
 
         public void CreateConfig(string Path) {
             try {

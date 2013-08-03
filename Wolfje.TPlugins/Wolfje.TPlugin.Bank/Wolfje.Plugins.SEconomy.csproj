@@ -12,6 +12,8 @@
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
+    <ProductVersion>12.0.0</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -21,6 +23,14 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <CustomCommands>
+      <CustomCommands>
+        <Command type="Execute" command="../../ServerInstance/TerrariaServer.exe" workingdir="../../ServerInstance/" externalConsole="True" />
+        <Command type="BeforeExecute" />
+      </CustomCommands>
+    </CustomCommands>
+    <Externalconsole>true</Externalconsole>
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -30,38 +40,43 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <WarningLevel>4</WarningLevel>
+    <Optimize>false</Optimize>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+    <OutputPath>bin\x86\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="HttpServer">
       <HintPath>..\..\BuildReferences\TShock\HttpServer.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Threading.Tasks">
-      <HintPath>..\..\packages\Microsoft.Bcl.Async.1.0.16\lib\net40\Microsoft.Threading.Tasks.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Threading.Tasks.Extensions">
-      <HintPath>..\..\packages\Microsoft.Bcl.Async.1.0.16\lib\net40\Microsoft.Threading.Tasks.Extensions.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.Threading.Tasks.Extensions.Desktop">
-      <HintPath>..\..\packages\Microsoft.Bcl.Async.1.0.16\lib\net40\Microsoft.Threading.Tasks.Extensions.Desktop.dll</HintPath>
-    </Reference>
     <Reference Include="Mono.Data.Sqlite">
       <HintPath>..\..\BuildReferences\TShock\Mono.Data.Sqlite.dll</HintPath>
-    </Reference>
-    <Reference Include="MySql.Data, Version=6.6.5.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\BuildReferences\TShock\MySql.Data.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>..\..\BuildReferences\TShock\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Net" />
-    <Reference Include="System.Runtime">
-      <HintPath>..\..\packages\Microsoft.Bcl.1.0.19\lib\net40\System.Runtime.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Threading.Tasks">
-      <HintPath>..\..\packages\Microsoft.Bcl.1.0.19\lib\net40\System.Threading.Tasks.dll</HintPath>
-    </Reference>
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -73,51 +88,57 @@
     <Reference Include="TShockAPI">
       <HintPath>..\..\BuildReferences\TShock\TShockAPI.dll</HintPath>
     </Reference>
+    <Reference Include="MySql.Data">
+      <HintPath>..\..\BuildReferences\TShock\MySql.Data.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ChatCommands.cs" />
     <Compile Include="Configuration\Configuration.cs" />
-    <Compile Include="Economy\BankAccount.Events.cs" />
     <Compile Include="Economy\EconomyPlayer.cs" />
-    <Compile Include="Economy\BankAccount.cs" />
     <Compile Include="Enumerations.cs" />
-    <Compile Include="Modules\CmdAlias\AliasCommand.cs" />
-    <Compile Include="Modules\CmdAlias\CmdAliasPlugin.cs" />
-    <Compile Include="Modules\CmdAlias\Configuration.cs" />
-    <Compile Include="Modules\ModuleLoader.cs" />
-    <Compile Include="Modules\VaultEx\BossNPC.cs" />
-    <Compile Include="Modules\VaultEx\VaultConfig.cs" />
-    <Compile Include="Modules\VaultEx\VaultEx.cs" />
-    <Compile Include="Modules\VaultEx\VaultPlayer.cs" />
-    <Compile Include="Money.cs" />
-    <Compile Include="DatabaseEngine\SQLite.cs" />
-    <Compile Include="DatabaseDriver.cs" />
-    <Compile Include="DatabaseEngine\SQLiteAsync.cs" />
-    <Compile Include="DatabaseObjects\BankAccount.cs" />
-    <Compile Include="DatabaseObjects\BankAccountTransaction.cs" />
+    <Compile Include="Forms\CAccountManagementWnd.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\CAccountManagementWnd.Designer.cs">
+      <DependentUpon>CAccountManagementWnd.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\Form.Extensions.cs" />
+    <Compile Include="Journal\XBankAccount.Transfer.cs" />
+    <Compile Include="Economy\Money.cs" />
     <Compile Include="Performance\Profiler.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
     <Compile Include="SEconomyPlugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="TShockCommand.Extensions.cs" />
-    <Compile Include="TSPlayer.Extensions.cs" />
+    <Compile Include="Extensions\TShockCommand.Extensions.cs" />
+    <Compile Include="Extensions\TSPlayer.Extensions.cs" />
+    <Compile Include="Journal\TransactionJournal.cs" />
+    <Compile Include="Journal\XBankAccount.cs" />
+    <Compile Include="Journal\XTransaction.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Permissions.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Wolfje.Plugins.SEconomy.ModuleFramework\Wolfje.Plugins.SEconomy.ModuleFramework.csproj">
-      <Project>{0b0b8622-1c54-47a6-81b6-596058dce125}</Project>
-      <Name>Wolfje.Plugins.SEconomy.ModuleFramework</Name>
-    </ProjectReference>
+    <Compile Include="Journal\XBankAccount.Events.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
+    <EmbeddedResource Include="Forms\CAccountManagementWnd.resx">
+      <DependentUpon>CAccountManagementWnd.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>xcopy /y /i $(TargetPath) $(SolutionDir)\ServerInstance\ServerPlugins</PostBuildEvent>
   </PropertyGroup>
-  <Import Project="..\..\packages\Microsoft.Bcl.Build.1.0.7\tools\Microsoft.Bcl.Build.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
@@ -125,4 +146,14 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  <ProjectExtensions>
+    <MonoDevelop>
+      <Properties>
+        <Policies>
+          <TextStylePolicy inheritsSet="VisualStudio" inheritsScope="text/plain" scope="text/x-csharp" />
+          <CSharpFormattingPolicy IndentSwitchBody="True" NamespaceBraceStyle="EndOfLine" ClassBraceStyle="EndOfLine" InterfaceBraceStyle="EndOfLine" StructBraceStyle="EndOfLine" EnumBraceStyle="EndOfLine" MethodBraceStyle="EndOfLine" ConstructorBraceStyle="EndOfLine" DestructorBraceStyle="EndOfLine" PropertyBraceStyle="NextLine" ElseNewLinePlacement="NewLine" CatchNewLinePlacement="NewLine" FinallyNewLinePlacement="NewLine" WhileNewLinePlacement="DoNotCare" ArrayInitializerWrapping="DoNotChange" ArrayInitializerBraceStyle="NextLine" BeforeMethodDeclarationParentheses="False" BeforeMethodCallParentheses="False" BeforeConstructorDeclarationParentheses="False" BeforeDelegateDeclarationParentheses="False" NewParentheses="False" SpacesBeforeBrackets="False" BlankLinesAfterUsings="0" BlankLinesBetweenTypes="0" BlankLinesBetweenMembers="0" inheritsSet="Mono" inheritsScope="text/x-csharp" scope="text/x-csharp" />
+        </Policies>
+      </Properties>
+    </MonoDevelop>
+  </ProjectExtensions>
 </Project>

@@ -6,13 +6,12 @@ using System.Text;
 using System.Reflection;
 using Terraria;
 
-using Wolfje.Plugins.SEconomy;
-using Wolfje.Plugins.SEconomy.ModuleFramework;
+using System.Threading.Tasks;
 
 namespace Wolfje.Plugins.SEconomy.VaultExModule {
 
-    [SEconomyModule]
-    public class VaultEx : ModuleBase {
+    [APIVersion(1,12)]
+    public class VaultEx : TerrariaPlugin {
 
         public static List<VaultPlayer> PlayerList { get; set; }
         internal static List<BossNPC> BossList { get; set; }
@@ -21,8 +20,7 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
 
         internal static readonly Random _r = new Random();
 
-        public VaultEx() : base() { 
-        }
+        public VaultEx(Main game) : base(game) { Order = 9999; }
 
         #region "API Plugin Stub"
         public override string Author {
@@ -39,7 +37,7 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
 
         public override string Name {
             get {
-                return "VaultEx for SEconomy";
+                return "Suck my dick";
             }
         }
 
@@ -51,14 +49,12 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
 
         #endregion
 
-
-
         public override void Initialize() {
 
             PlayerList = new List<VaultPlayer>();
             BossList = new List<BossNPC>();
 
-            Config = VaultConfig.ReadConfig("VaultEx.json");
+            Config = VaultConfig.ReadConfig("tshock" + System.IO.Path.DirectorySeparatorChar + "SEconomy" + System.IO.Path.DirectorySeparatorChar + "VaultEx.config.json");
 
             Hooks.NetHooks.GetData += NetHooks_GetData;
             Hooks.NetHooks.SendData += NetHooks_SendData;
@@ -76,10 +72,6 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
             base.Dispose(disposing);
         }
 
-        void EconomyPlayer_PlayerBankAccountLoaded(object sender, EventArgs e) {
-            SEconomy.Economy.BankAccount ba = sender as SEconomy.Economy.BankAccount;
-            Console.WriteLine(ba.Owner.TSPlayer.Name);
-        }
 
         void ServerHooks_Join(int who, System.ComponentModel.HandledEventArgs arg2) {
             PlayerList.Add(new VaultPlayer(who));
@@ -90,7 +82,7 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
         /// </summary>
         void NetHooks_SendData(Hooks.SendDataEventArgs e) {
             if (e.MsgID == PacketTypes.NpcStrike) {
-                 NPC npc = Main.npc[e.number];
+                NPC npc = Main.npc[e.number];
 
                 if (npc != null) {
 
@@ -110,7 +102,17 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
                                             SEconomy.Economy.EconomyPlayer ePlayer = SEconomyPlugin.GetEconomyPlayerSafe(reward.Key);
                                             if (ePlayer != null) {
                                                 //Pay from the world account to the reward recipient.
-                                                SEconomyPlugin.WorldAccount.TransferToAccountAsync(ePlayer.BankAccount, reward.Value, Economy.BankAccountTransferOptions.AnnounceToReceiver);
+                                                Journal.BankAccountTransferOptions options = Journal.BankAccountTransferOptions.None;
+
+                                                if (Config.AnnounceBossGain) {
+                                                    options |= Journal.BankAccountTransferOptions.AnnounceToReceiver;
+                                                }
+
+                                                if (reward.Value < 0) {
+                                                    TShockAPI.Log.ConsoleError(string.Format("Reward for {0} is {1}.", ePlayer.TSPlayer.Name, reward.Value));
+                                                } else {
+                                                    SEconomyPlugin.WorldAccount.TransferToAsync(ePlayer.BankAccount, reward.Value, options, string.Format("VX: {0} reward for boss {1}",ePlayer.TSPlayer.Name, npc.name) );
+                                                }
                                             }
                                         }
 
@@ -154,15 +156,20 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
 
                                 int i = player.TSPlayer.Index;
 
-                                try {
-                                    Economy.EconomyPlayer ep = SEconomyPlugin.GetEconomyPlayerSafe(i);
+                                SEconomy.Economy.EconomyPlayer epl = SEconomyPlugin.GetEconomyPlayerSafe(i);
+                                Journal.BankAccountTransferOptions options = Journal.BankAccountTransferOptions.None;
 
-                                    SEconomyPlugin.WorldAccount.TransferToPlayerAsync(i, rewardAmt, Economy.BankAccountTransferOptions.AnnounceToReceiver);
-                                } catch (Exception ex) {
-
+                                if (Config.AnnounceKillGain) {
+                                    options |= Journal.BankAccountTransferOptions.AnnounceToReceiver;
                                 }
 
-                                // player.ChangeMoney(rewardAmt, MoneyEventFlags.Kill, config.AnnounceKillGain);
+                                if (rewardAmt < 0) {
+                                    TShockAPI.Log.ConsoleError(string.Format("Reward for {0} is {1}.", epl.TSPlayer.Name, rewardAmt));
+                                } else {
+
+                                    SEconomyPlugin.WorldAccount.TransferToAsync(i, rewardAmt, options, string.Format("VX: {0} reward for {1}", epl.TSPlayer.Name, npc.name)); 
+                                }
+
                             }
                             player.AddKill(npc.netID);
                         }
@@ -180,7 +187,7 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
                     if (Config.StaticDeathPenalty) {
                         penaltyAmmount = _r.Next(Config.DeathPenaltyMin, Config.DeathPenaltyMax);
                     } else if ( eDeadPlayer.BankAccount != null )  {
-                        penaltyAmmount = (long)(eDeadPlayer.BankAccount.Money * (Config.DeathPenaltyPercent / 100f));
+                        penaltyAmmount = (long)(eDeadPlayer.BankAccount.Balance * (Config.DeathPenaltyPercent / 100f));
                     }
 
                     //   Console.WriteLine("penalty ammount: {0}", penaltyAmmount);
@@ -190,26 +197,20 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
                             Economy.EconomyPlayer eKiller = SEconomyPlugin.GetEconomyPlayerSafe(deadPlayer.LastPVPID);
                             
                             if (eKiller != null && eKiller.BankAccount != null) {
-                                Economy.BankAccountTransferOptions options = Economy.BankAccountTransferOptions.MoneyFromPvP;
-                                if (Config.AnnounceKillGain) {
-                                    options |= Economy.BankAccountTransferOptions.AnnounceToReceiver;
-                                    options |= Economy.BankAccountTransferOptions.AnnounceToSender;
-                                }
+                                Journal.BankAccountTransferOptions options = Journal.BankAccountTransferOptions.MoneyFromPvP | Journal.BankAccountTransferOptions.AnnounceToReceiver | Journal.BankAccountTransferOptions.AnnounceToSender;
+
                               //  killer.ChangeMoney(penaltyAmmount, MoneyEventFlags.PvP, true);
 
                                 //Here in PVP the loser pays the winner money out of their account.
-                                eDeadPlayer.BankAccount.TransferToPlayerAsync(deadPlayer.LastPVPID, penaltyAmmount, options);
+                                eDeadPlayer.BankAccount.TransferToAsync(deadPlayer.LastPVPID, penaltyAmmount, options, string.Format("VX: PVP: {0} killed {1}", killer.TSPlayer.Name, deadPlayer.TSPlayer.Name));
                             }
                         }
                     } else if (!deadPlayer.TSPlayer.Group.HasPermission("vault.bypass.death")) {
+                        Journal.BankAccountTransferOptions options = Journal.BankAccountTransferOptions.MoneyFromPvP | Journal.BankAccountTransferOptions.AnnounceToReceiver;
+
                        // deadPlayer.ChangeMoney(-penaltyAmmount, MoneyEventFlags.Death, true);
 
-                        Economy.BankAccountTransferOptions options = Economy.BankAccountTransferOptions.MoneyFromPvP;
-                        if (Config.AnnounceKillGain) {
-                            options |= Economy.BankAccountTransferOptions.AnnounceToReceiver;
-                        }
-
-                        SEconomyPlugin.WorldAccount.TransferToPlayerAsync(deadPlayer.Index, -penaltyAmmount, options);
+                        SEconomyPlugin.WorldAccount.TransferToAsync(deadPlayer.Index, -penaltyAmmount, options, string.Format("VX: {0} died.", deadPlayer.TSPlayer.Name));
                     }
                 }
             } else if (e.MsgID == PacketTypes.PlayerDamage) {

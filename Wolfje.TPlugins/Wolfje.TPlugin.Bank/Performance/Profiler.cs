@@ -8,32 +8,48 @@ using System.Diagnostics;
 namespace Wolfje.Plugins.SEconomy.Performance {
     internal class Profiler {
 
-        Hashtable _profilerTable;
-
-        public void Enter(string Name) {
-            if (_profilerTable == null) {
-                _profilerTable = new Hashtable(100);
-            }
-
-            if (!_profilerTable.ContainsKey(Name)) {
-                _profilerTable.Add(Name, Stopwatch.StartNew());
-            }
+        internal class Profile {
+            public string Name { get; set; }
+            public Guid ID { get; set; }
+            public Stopwatch Stopwatch { get; set; }
         }
 
-        public KeyValuePair<string, long>? Exit(string Name) {
-            if (_profilerTable.ContainsKey(Name)) {
-                Stopwatch value = _profilerTable[Name] as Stopwatch;
+        List<Profile> _profilerTable;
+
+        public Guid Enter(string Name) {
+            if (!Configuration.EnableProfiler) {
+                return Guid.Empty;
+            }
+
+            if (_profilerTable == null) {
+                _profilerTable = new List<Profile>(100);
+            }
+            Profile profile = new Profile() { ID = Guid.NewGuid(), Name = Name, Stopwatch = Stopwatch.StartNew() };
+            _profilerTable.Add(profile);
+
+            return profile.ID;
+        }
+
+        public KeyValuePair<string, long>? Exit(Guid id) {
+            Profile profile = _profilerTable.SingleOrDefault(i => i.ID == id);
+
+            if (profile != null) {
+                Stopwatch value = profile.Stopwatch;
                 value.Stop();
 
-                _profilerTable.Remove(Name);
-                return new KeyValuePair<string, long>(Name, value.ElapsedMilliseconds);
+                _profilerTable.Remove(profile);
+                return new KeyValuePair<string, long>(profile.Name, value.ElapsedMilliseconds);
             }
 
             return null;
         }
 
-        public string ExitString(string Name) {
-            var profile = Exit(Name);
+        public string ExitString(Guid id) {
+            if (!Configuration.EnableProfiler) {
+                return "";
+            }
+
+            var profile = Exit(id);
 
             if (profile.HasValue) {
                 return string.Format("profiler: {0} took {1}ms.", profile.Value.Key, profile.Value.Value);
@@ -42,8 +58,12 @@ namespace Wolfje.Plugins.SEconomy.Performance {
             }
         }
 
-        public void ExitLog(string Name) {
-            var profile = Exit(Name);
+        public void ExitLog(Guid id) {
+            if (!Configuration.EnableProfiler) {
+                return;
+            }
+
+            var profile = Exit(id);
 
             if (profile.HasValue) {
                 TShockAPI.Log.ConsoleInfo(string.Format("profiler: {0} took {1}ms.", profile.Value.Key, profile.Value.Value));

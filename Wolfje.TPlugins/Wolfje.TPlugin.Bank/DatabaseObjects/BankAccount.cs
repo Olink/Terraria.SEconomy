@@ -25,13 +25,13 @@ namespace Wolfje.Plugins.SEconomy.DatabaseObjects {
         public int BankAccountK { get; set; }
         public string UserAccountName { get; set; }
         public long WorldID { get; set; }
-        public BankAccountFlags Flags { get; set; }
+        public Journal.BankAccountFlags Flags { get; set; }
         public string Description { get; set; }
 
        /// <summary>
        /// Updates the bank account flags from a database.  Called when enabled changes, etc.
        /// </summary>
-        internal async Task<BankAccountFlags?> UpdateFlagsAsync(BankAccountFlags NewFlags) {
+        internal async Task<Journal.BankAccountFlags?> UpdateFlagsAsync(Journal.BankAccountFlags NewFlags) {
             int numberOfRecordsUpdated = await SEconomyPlugin.Database.AsyncConnection.ExecuteAsync("update bankaccount set flags = @0 where bankaccountk = @1", NewFlags, this.BankAccountK);
             // number of rows affected
             if (numberOfRecordsUpdated == 1) {
@@ -51,7 +51,7 @@ namespace Wolfje.Plugins.SEconomy.DatabaseObjects {
         internal async Task<long> GetBalanceFromDatabaseAsync() {
             
             //Directly query a bank balance.
-            return await SEconomyPlugin.Database.AsyncConnection.ExecuteScalarAsync<long>("select coalesce(sum(Amount), 0) AS Balance from BankAccountTransaction where BankAccountFK = @0 and Flags = @1", this.BankAccountK, BankAccountTransactionFlags.FundsAvailable);
+            return await SEconomyPlugin.Database.AsyncConnection.ExecuteScalarAsync<long>("select coalesce(sum(Amount), 0) AS Balance from BankAccountTransaction where BankAccountFK = @0 and (Flags & 1) = 1", this.BankAccountK);
         }
     }
 }
