@@ -32,6 +32,12 @@ namespace Wolfje.Plugins.SEconomy {
 
         public static bool BackupCanRun { get; set; }
 
+        public static Version PluginVersion {
+            get {
+                return Assembly.GetExecutingAssembly().GetName().Version;
+            }
+        }
+
         public static List<Economy.EconomyPlayer> EconomyPlayers {
             get {
                 return economyPlayers;
@@ -93,8 +99,12 @@ namespace Wolfje.Plugins.SEconomy {
         /// Destructor:  flush uncommitted transactions to disk before this object is cleaned up.
         /// </summary>
         ~SEconomyPlugin() {
-            Console.WriteLine("seconomy journal: emergency flushing journal to disk.");
-            Journal.TransactionJournal.SaveXml(Configuration.JournalPath);
+            lock (Journal.TransactionJournal.__staticLock) {
+                if (Journal.TransactionJournal.XmlJournal != null) {
+                    Console.WriteLine("seconomy journal: emergency flushing journal to disk.");
+                    Journal.TransactionJournal.SaveXml(Configuration.JournalPath);
+                }
+            }
         }
 
         /// <summary>

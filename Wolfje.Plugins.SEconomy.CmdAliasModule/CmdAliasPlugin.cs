@@ -20,6 +20,9 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
 
         static Configuration Configuration { get; set; }
 
+        static readonly object __rndLock = new object();
+        static readonly Random randomGenerator = new Random();
+
         #region "API stub"
 
         public CmdAliasPlugin(Terraria.Main game) : base(game) { }
@@ -73,18 +76,33 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
 
         private void ChatCommand_GeneralCommand(TShockAPI.CommandArgs args) {
 
-            if (args.Parameters.Count >= 1 && args.Parameters[0].Equals("reload", StringComparison.CurrentCultureIgnoreCase)) {
-                ReloadConfigAfterDelay(5);
+            if (args.Parameters.Count >= 1 && args.Parameters[0].Equals("reload", StringComparison.CurrentCultureIgnoreCase) && args.Player.Group.HasPermission("aliascmd.reloadconfig")) {
+
+                args.Player.SendInfoMessage("aliascmd: Reloading configuration file.");
+
+                ReloadConfigAfterDelayAsync(1).ContinueWith((task) => {
+                    if (task.IsFaulted) {
+                        args.Player.SendErrorMessage("aliascmd: reload failed.  You need to check the server console to find out what went wrong.");
+                        TShockAPI.Log.ConsoleError(task.Exception.ToString());
+                    } else {
+                        args.Player.SendInfoMessage("aliascmd: reload successful.");
+                    }
+                });
             } else {
                 args.Player.SendErrorMessageFormat("aliascmd: usage: /aliascmd reload: reloads the AliasCmd configuration file.");
             }
 
         }
 
-       void ReloadConfigAfterDelay(int DelaySeconds) {
+        /// <summary>
+        /// Asynchronously reparses the AliasCmd configuration file after the specified period.
+        /// </summary>
+        /// <param name="DelaySeconds"></param>
+        /// <returns></returns>
+       Task ReloadConfigAfterDelayAsync(int DelaySeconds) {
 
-           Task.Factory.StartNew(() => {
-               System.Threading.Thread.Sleep(5000);
+           return Task.Factory.StartNew(() => {
+               System.Threading.Thread.Sleep(DelaySeconds * 1000);
 
                TShockAPI.Log.ConsoleInfo("AliasCmd: reloading config.");
 
@@ -96,6 +114,7 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
 
                } catch (Exception ex) {
                    TShockAPI.Log.ConsoleError("aliascmd: Your new config could not be loaded, fix any problems and save the file.  Your old configuration is in effect until this is fixed. \r\n\r\n" + ex.ToString());
+                   throw;
                }
 
                TShockAPI.Log.ConsoleInfo("AliasCmd: config reload done.");
@@ -103,15 +122,6 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
            });
 
         }
-
-        /// <summary>
-        /// Occurs when this module's configuration file has been modified, causes a reload.
-        /// </summary>
-        void CmdAliasPlugin_ConfigFileChanged(object sender, EventArgs e) {
-            TShockAPI.Log.ConsoleInfo("AliasCmd: config file changed.  Reloading in 5 seconds");
-            ReloadConfigAfterDelay(5);
-        }
-
 
         public void ParseCommands() {
             //potential shit idea and thread deadlocks.  If this proves a problem and the mutex ends up indefinite
@@ -207,7 +217,6 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
                 mangledString = mangledString.Replace("$callername", player.Name);
 
                 //$random(x,y) support.  Returns a random number between x and y
-
                 if (randomRegex.IsMatch(mangledString)) {
                     foreach (Match match in randomRegex.Matches(mangledString)) {
                         int randomFrom = 0;
@@ -216,9 +225,12 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
                         if (!string.IsNullOrEmpty(match.Groups[2].Value) && int.TryParse(match.Groups[2].Value, out randomTo)
                             && !string.IsNullOrEmpty(match.Groups[1].Value) && int.TryParse(match.Groups[1].Value, out randomFrom)) {
 
-                            Random random = new Random();
-
-                            mangledString = mangledString.Replace(match.ToString(), random.Next(randomFrom, randomTo).ToString());
+                            // this is a critical section
+                            // Random class is seeded from the system clock if you construct one without a seed.
+                            // therefore, calls to Next() at exactly the same point in time is likely to produce the same number.
+                                lock (__rndLock) {
+                                    mangledString = mangledString.Replace(match.ToString(), randomGenerator.Next(randomFrom, randomTo).ToString());
+                                }
                         } else {
                             TShockAPI.Log.ConsoleError(match.ToString() + " has some stupid shit in it, have a look at your AliasCmd config file.");
                             mangledString = mangledString.Replace(match.ToString(), "");
@@ -234,7 +246,7 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
                         Economy.EconomyPlayer impersonatedPlayer = SEconomyPlugin.GetEconomyPlayerSafe(impersonatedName);
 
                         if (impersonatedPlayer != null) {
-                            string commandToRun = match.Groups[3].Value;;
+                            string commandToRun = match.Groups[3].Value;
                             player = impersonatedPlayer.TSPlayer;
 
                             mangledString = commandToRun.Trim();

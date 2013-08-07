@@ -21,6 +21,43 @@ namespace Wolfje.Plugins.SEconomy {
 
             string namePrefix = "Your";
 
+            if (args.Parameters.Count == 0) {
+                args.Player.SendInfoMessageFormat("This server is running SEconomy v{0}", SEconomyPlugin.PluginVersion);
+                args.Player.SendInfoMessage("You can:");
+
+                args.Player.SendInfoMessage("* View your balance with /bank bal");
+
+                if (args.Player.Group.HasPermission("bank.transfer")) {
+                    args.Player.SendInfoMessage("* Trade players with /bank pay <player> <amount>");
+                }
+
+                if (args.Player.Group.HasPermission("bank.viewothers")) {
+                    args.Player.SendInfoMessage("* View other people's balance with /bank bal <player>");
+                }
+
+                if (args.Player.Group.HasPermission("bank.worldtransfer")) {
+                    args.Player.SendInfoMessage("* Spawn/delete money with /bank give|take <player> <amount>");
+                }
+
+                if (args.Player.Group.HasPermission("bank.mgr")) {
+                    args.Player.SendInfoMessage("* Spawn the account manager GUI on the server with /bank mgr");
+                }
+
+                if (args.Player.Group.HasPermission("bank.savejournal")) {
+                    args.Player.SendInfoMessage("* Save the journal with /bank savejournal");
+                }
+
+                if (args.Player.Group.HasPermission("bank.loadjournal")) {
+                    args.Player.SendInfoMessage("* Load the journal with /bank loadjournal");
+                }
+
+                if (args.Player.Group.HasPermission("bank.squashjournal")) {
+                    args.Player.SendInfoMessage("* Compress the journal with /bank squashjournal");
+                }
+
+                return;
+            }
+
             //Bank balance
             if (args.Parameters[0].Equals("bal", StringComparison.CurrentCultureIgnoreCase)
                 || args.Parameters[0].Equals("balance", StringComparison.CurrentCultureIgnoreCase)) {
@@ -48,46 +85,47 @@ namespace Wolfje.Plugins.SEconomy {
                 } else {
                     args.Player.SendInfoMessage("bank balance: Cannot find player or no bank account.");
                 }
-            }
-
-            if (args.Parameters[0].Equals("mgr")) {
+            } else if (args.Parameters[0].Equals("mgr")) {
                 if (args.Player.Group.HasPermission("bank.mgr")) {
-                    Forms.CAccountManagementWnd wnd = new Forms.CAccountManagementWnd();
 
-                    Task.Factory.StartNew(() => {
-                        TShockAPI.Log.ConsoleInfo("seconomy management: opening bank manager window");
+                    if (args.Player is TShockAPI.TSServerPlayer) {
+                        Forms.CAccountManagementWnd wnd = new Forms.CAccountManagementWnd();
 
-                        //writing the journal is not possible when you're fucking with it in the manager
-                        //last thing you want is for half baked changes to be pushed to disk
-                        SEconomyPlugin.BackupCanRun = false;
-                        
-                        wnd.ShowDialog();
-                    }, creationOptions: TaskCreationOptions.LongRunning).ContinueWith((task) => {
+                        Task.Factory.StartNew(() => {
+                            TShockAPI.Log.ConsoleInfo("seconomy management: opening bank manager window");
 
-                        SEconomyPlugin.BackupCanRun = true;
+                            //writing the journal is not possible when you're fucking with it in the manager
+                            //last thing you want is for half baked changes to be pushed to disk
+                            SEconomyPlugin.BackupCanRun = false;
 
-                        TShockAPI.Log.ConsoleInfo("seconomy management: window closed");
-                        Journal.TransactionJournal.BackupJournalAsync();
-                    });
+                            wnd.ShowDialog();
+                        }, creationOptions: TaskCreationOptions.LongRunning).ContinueWith((task) => {
+
+                            SEconomyPlugin.BackupCanRun = true;
+
+                            TShockAPI.Log.ConsoleInfo("seconomy management: window closed");
+                            Journal.TransactionJournal.BackupJournalAsync();
+                        });
+                    } else {
+                        args.Player.SendErrorMessage("Only the console can do that.");
+                    }
                 }
-            }
 
-            if (args.Parameters[0].Equals("savejournal")) {
+            } else if (args.Parameters[0].Equals("savejournal")) {
                 if (args.Player.Group.HasPermission("bank.savejournal")) {
                     args.Player.SendInfoMessage("seconomy xml: Backing up transaction journal.");
 
                     Journal.TransactionJournal.SaveXml(Configuration.JournalPath);
                 }
-            }
-            if (args.Parameters[0].Equals("loadjournal")) {
+
+            } else if (args.Parameters[0].Equals("loadjournal")) {
                 if (args.Player.Group.HasPermission("bank.loadjournal")) {
                     args.Player.SendInfoMessage("seconomy xml: Loading transaction journal from file");
 
                     Journal.TransactionJournal.LoadFromXmlFile(Configuration.JournalPath);
                 }
-            }
 
-            if (args.Parameters[0].Equals("squashjournal", StringComparison.CurrentCultureIgnoreCase)) {
+            } else if (args.Parameters[0].Equals("squashjournal", StringComparison.CurrentCultureIgnoreCase)) {
                 if (args.Player.Group.HasPermission("bank.squashjournal")) {
                     Guid p = SEconomyPlugin.Profiler.Enter("Squash journal");
                     Journal.TransactionJournal.SquashJournalAsync().ContinueWith((task) => {
@@ -98,10 +136,8 @@ namespace Wolfje.Plugins.SEconomy {
                 } else {
                     args.Player.SendErrorMessage("bank squashjournal: You do not have permission to perform this command.");
                 }
-            }
-
-            //Admin command: lists people's balances
-            if (args.Parameters[0].Equals("listbal", StringComparison.CurrentCultureIgnoreCase)) {
+            } else if (args.Parameters[0].Equals("listbal", StringComparison.CurrentCultureIgnoreCase)) {
+                //Admin command: lists people's balances
                 if (args.Player.Group.HasPermission("bank.listbal")) {
                     int takeFrom = 0, takeTo = 25, page = 1;
 
@@ -120,14 +156,11 @@ namespace Wolfje.Plugins.SEconomy {
                     }            
                 }
 
-            }
-
-            //Account enable
-
-            if (args.Parameters[0].Equals("ena", StringComparison.CurrentCultureIgnoreCase)
+            } else if (args.Parameters[0].Equals("ena", StringComparison.CurrentCultureIgnoreCase)
                 || args.Parameters[0].Equals("enable", StringComparison.CurrentCultureIgnoreCase)
                 || args.Parameters[0].Equals("dis", StringComparison.CurrentCultureIgnoreCase)
                 || args.Parameters[0].Equals("disable", StringComparison.CurrentCultureIgnoreCase)) {
+                //Account enable
 
                 //Flag to set the account to
                 bool enableAccount = args.Parameters[0].Equals("ena", StringComparison.CurrentCultureIgnoreCase) || args.Parameters[0].Equals("enable", StringComparison.CurrentCultureIgnoreCase);
@@ -145,13 +178,11 @@ namespace Wolfje.Plugins.SEconomy {
                 if (selectedPlayer != null && selectedPlayer.BankAccount != null) {
                     selectedPlayer.BankAccount.SetAccountEnabled(args.Player.Index, enableAccount);
                 }
-            }
-
-            //Player-to-player transfer
-            if (args.Parameters[0].Equals("pay", StringComparison.CurrentCultureIgnoreCase)
+            } else if (args.Parameters[0].Equals("pay", StringComparison.CurrentCultureIgnoreCase)
                 || args.Parameters[0].Equals("transfer", StringComparison.CurrentCultureIgnoreCase)
                 || args.Parameters[0].Equals("tfr", StringComparison.CurrentCultureIgnoreCase)) {
-
+                //Player-to-player transfer
+            
                 if (selectedPlayer.TSPlayer.Group.HasPermission("bank.transfer")) {
                     // /bank pay wolfje 1p
                     if (args.Parameters.Count >= 3) {
@@ -176,12 +207,10 @@ namespace Wolfje.Plugins.SEconomy {
                     args.Player.SendErrorMessageFormat("bank pay: You don't have permission to do that.");
                 }
 
-            }
-
-            //World-to-player transfer
-            if (args.Parameters[0].Equals("give", StringComparison.CurrentCultureIgnoreCase)
+            } else if (args.Parameters[0].Equals("give", StringComparison.CurrentCultureIgnoreCase)
                || args.Parameters[0].Equals("take", StringComparison.CurrentCultureIgnoreCase)) {
-
+                //World-to-player transfer
+            
                 if (selectedPlayer.TSPlayer.Group.HasPermission("bank.worldtransfer")) {
                     // /bank give wolfje 1p
                     if (args.Parameters.Count >= 3) {
@@ -211,8 +240,6 @@ namespace Wolfje.Plugins.SEconomy {
                     args.Player.SendErrorMessageFormat("bank give: You don't have permission to do that.");
                 }
             }
-
-
         }
         
     }

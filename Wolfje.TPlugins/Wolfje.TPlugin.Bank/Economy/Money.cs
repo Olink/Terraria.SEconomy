@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace Wolfje.Plugins.SEconomy {
     /// <summary>
     /// A representation of Money in Seconomy.  Money objects are toll-free bridged with 64-bit integers (long).
     /// </summary>
     public struct Money {
+        static readonly object __staticLock = new object();
+
         //ye olde godly value base type
         private long _moneyValue;
 
@@ -76,7 +79,9 @@ namespace Wolfje.Plugins.SEconomy {
         /// </summary>
         public long Platinum {
             get {
-                return (long)Math.Floor((decimal)(_moneyValue / ONE_PLATINUM));
+                lock (__staticLock) {
+                    return (long)Math.Floor((decimal)(_moneyValue / ONE_PLATINUM));
+                }
             }
         }
 
@@ -85,7 +90,9 @@ namespace Wolfje.Plugins.SEconomy {
         /// </summary>
         public long Gold {
             get {
-                return (long)((_moneyValue % ONE_PLATINUM) - (_moneyValue % ONE_GOLD)) / 10000;
+                lock (__staticLock) {
+                    return (long)((_moneyValue % ONE_PLATINUM) - (_moneyValue % ONE_GOLD)) / 10000;
+                }
             }
         }
 
@@ -94,7 +101,9 @@ namespace Wolfje.Plugins.SEconomy {
         /// </summary>
         public long Silver {
             get {
-                return (long)((_moneyValue % ONE_GOLD) - (_moneyValue % ONE_SILVER)) / 100;
+                lock (__staticLock) {
+                    return (long)((_moneyValue % ONE_GOLD) - (_moneyValue % ONE_SILVER)) / 100;
+                }
             }
         }
 
@@ -103,7 +112,9 @@ namespace Wolfje.Plugins.SEconomy {
         /// </summary>
         public long Copper {
             get {
-                return (long)_moneyValue % 100;
+                lock (__staticLock) {
+                    return (long)_moneyValue % 100;
+                }
             }
         }
 
@@ -111,61 +122,68 @@ namespace Wolfje.Plugins.SEconomy {
         /// Returns the string representation of this money (in "pgsc" format)
         /// </summary>
         public override string ToString() {
-            StringBuilder sb = new StringBuilder();
-            Money moneyCopy = this;
+            lock (__staticLock) {
+                StringBuilder sb = new StringBuilder();
+                Money moneyCopy = this;
 
-            //Negative balances still need to display like they are positives
-            if (moneyCopy < 0) {
-                sb.Append("-");
-                moneyCopy = moneyCopy * (-1);
-            }
+                //Negative balances still need to display like they are positives
+                if (moneyCopy < 0) {
+                    sb.Append("-");
+                    moneyCopy = moneyCopy * (-1);
+                }
 
-            if (moneyCopy.Platinum > 0) {
-                sb.AppendFormat("{0}p", moneyCopy.Platinum);
-            }
-            if (moneyCopy.Gold > 0) {
-                sb.AppendFormat("{0}g", moneyCopy.Gold);
-            }
-            if (moneyCopy.Silver > 0) {
-                sb.AppendFormat("{0}s", moneyCopy.Silver);
-            }
+                if (moneyCopy.Platinum > 0) {
+                    sb.AppendFormat("{0}p", moneyCopy.Platinum);
+                }
+                if (moneyCopy.Gold > 0) {
+                    sb.AppendFormat("{0}g", moneyCopy.Gold);
+                }
+                if (moneyCopy.Silver > 0) {
+                    sb.AppendFormat("{0}s", moneyCopy.Silver);
+                }
 
-            sb.AppendFormat("{0}c", moneyCopy.Copper);
-            
-            return sb.ToString();
+                sb.AppendFormat("{0}c", moneyCopy.Copper);
+
+                return sb.ToString();
+            }
         }
 
         /// <summary>
         /// Returns a long representation of this Money object.
         /// </summary>
         public string ToLongString(bool ShowNegativeSign = false) {
-            StringBuilder sb = new StringBuilder();
-            Money moneyCopy = this;
+            lock (__staticLock) {
+                StringBuilder sb = new StringBuilder();
+                long moneyCopy = 0L;
 
-            //Negative balances still need to display like they are positives
-            if (moneyCopy < 0) {
-                if (ShowNegativeSign) {
-                    sb.Append("-");
+                //atomic copy
+                Interlocked.Exchange(ref moneyCopy, this);
+
+                //Negative balances still need to display like they are positives
+                if (moneyCopy < 0) {
+                    if (ShowNegativeSign) {
+                        sb.Append("-");
+                    }
+
+                    Interlocked.Exchange(ref moneyCopy, moneyCopy * (-1));
                 }
 
-                moneyCopy = moneyCopy * (-1);
-            }
+                if (((Money)moneyCopy).Platinum > 0) {
+                    sb.AppendFormat("{0} plat", ((Money)moneyCopy).Platinum);
+                }
+                if (((Money)moneyCopy).Gold > 0) {
+                    sb.AppendFormat("{1}{0} gold", ((Money)moneyCopy).Gold, sb.Length > 0 ? " " : "");
+                }
+                if (((Money)moneyCopy).Silver > 0) {
+                    sb.AppendFormat("{1}{0} silver", ((Money)moneyCopy).Silver, sb.Length > 0 ? " " : "");
+                }
 
-            if (moneyCopy.Platinum > 0) {
-                sb.AppendFormat("{0} plat", moneyCopy.Platinum);
-            }
-            if (moneyCopy.Gold > 0) {
-                sb.AppendFormat("{1}{0} gold", moneyCopy.Gold, sb.Length > 0 ? " " : "");
-            }
-            if (moneyCopy.Silver > 0) {
-                sb.AppendFormat("{1}{0} silver", moneyCopy.Silver, sb.Length > 0 ? " " : "");
-            }
+                if (((Money)moneyCopy).Copper > 0 || ((Money)moneyCopy)._moneyValue == 0) {
+                    sb.AppendFormat("{1}{0} copper", ((Money)moneyCopy).Copper, sb.Length > 0 ? " " : "");
+                }
 
-            if (moneyCopy.Copper > 0 || moneyCopy._moneyValue == 0) {
-                sb.AppendFormat("{1}{0} copper", moneyCopy.Copper, sb.Length > 0 ? " " : "");
+                return sb.ToString();
             }
-
-            return sb.ToString();
         }
 
         /// <summary>
@@ -197,43 +215,45 @@ namespace Wolfje.Plugins.SEconomy {
         /// <param name="MoneyRepresentation">The money representation string, eg "1p1g", or "30s20c"</param>
         /// <returns>The money object parsed.  If not it'll return a big fat exception back in your face. :)</returns>
         public static Money Parse(string MoneyRepresentation) {
-            long totalMoney = 0;
+            lock (__staticLock) {
+                long totalMoney = 0;
 
-            if (!string.IsNullOrWhiteSpace(MoneyRepresentation) && new Regex("p|g|s|c").IsMatch(MoneyRepresentation)) {
-                Match moneyMatch = moneyRegex.Match(MoneyRepresentation);
-                long plat = 0, gold = 0, silver = 0, copper = 0;
-                string signedness = "";
+                if (!string.IsNullOrWhiteSpace(MoneyRepresentation) && new Regex("p|g|s|c").IsMatch(MoneyRepresentation)) {
+                    Match moneyMatch = moneyRegex.Match(MoneyRepresentation);
+                    long plat = 0, gold = 0, silver = 0, copper = 0;
+                    string signedness = "";
 
-                if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[1].Value))
-                    signedness = moneyMatch.Groups[1].Value;
+                    if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[1].Value))
+                        signedness = moneyMatch.Groups[1].Value;
 
-                if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[2].Value))
-                    plat = long.Parse(moneyMatch.Groups[3].Value);
+                    if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[2].Value))
+                        plat = long.Parse(moneyMatch.Groups[3].Value);
 
-                if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[4].Value))
-                    gold = long.Parse(moneyMatch.Groups[5].Value);
+                    if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[4].Value))
+                        gold = long.Parse(moneyMatch.Groups[5].Value);
 
-                if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[6].Value))
-                    silver = long.Parse(moneyMatch.Groups[7].Value);
+                    if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[6].Value))
+                        silver = long.Parse(moneyMatch.Groups[7].Value);
 
-                if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[8].Value))
-                    copper = long.Parse(moneyMatch.Groups[9].Value);
+                    if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[8].Value))
+                        copper = long.Parse(moneyMatch.Groups[9].Value);
 
-                totalMoney += plat * ONE_PLATINUM;
-                totalMoney += gold * ONE_GOLD;
-                totalMoney += silver * ONE_SILVER;
-                totalMoney += copper;
+                    totalMoney += plat * ONE_PLATINUM;
+                    totalMoney += gold * ONE_GOLD;
+                    totalMoney += silver * ONE_SILVER;
+                    totalMoney += copper;
 
-                //you can specify a minus at the start to indicate a negative amount.
-                if (!string.IsNullOrWhiteSpace(signedness)) {
-                    totalMoney = -totalMoney;
+                    //you can specify a minus at the start to indicate a negative amount.
+                    if (!string.IsNullOrWhiteSpace(signedness)) {
+                        totalMoney = -totalMoney;
+                    }
+                } else {
+                    //Attempt a plain conversion from a whole integer
+                    long.TryParse(MoneyRepresentation, out totalMoney);
                 }
-            } else {
-                //Attempt a plain conversion from a whole integer
-                long.TryParse(MoneyRepresentation, out totalMoney);
-            }
 
-            return totalMoney;
+                return totalMoney;
+            }
         }
     }
 }

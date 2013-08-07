@@ -29,7 +29,7 @@
   "MaximumLoginAttempts": 3,
   "RconPassword": "",
   "RconPort": 7777,
-  "ServerName": "",
+  "ServerName": "TShock Server",
   "UseServerName": false,
   "MasterServer": "127.0.0.1",
   "StorageType": "sqlite",

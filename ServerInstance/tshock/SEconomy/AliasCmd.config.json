@@ -31,6 +31,20 @@
       "Permissions": "",
       "UsageHelpText": "",
       "CooldownSeconds": 0
+    },    
+	{
+      "CommandAlias": "randombuff",
+      "CommandsToExecute": [
+        "/buff $random(1,40) $random(60,540)",
+        "/buff $random(1,40) $random(60,540)",
+        "/buff $random(1,40) $random(60,540)",
+        "/buff $random(1,40) $random(60,540)",
+        "/buff $random(1,40) $random(60,540)"
+      ],
+      "Cost": "0c",
+      "Permissions": "",
+      "UsageHelpText": "",
+      "CooldownSeconds": 0
     }
   ]
 }

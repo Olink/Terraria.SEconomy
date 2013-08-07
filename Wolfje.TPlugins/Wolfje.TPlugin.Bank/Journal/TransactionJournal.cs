@@ -17,6 +17,9 @@ namespace Wolfje.Plugins.SEconomy.Journal {
     /// </summary>
     public sealed partial class TransactionJournal {
 
+        //thread-safety; syncronization object to use when accessing changeable static members
+        public static readonly object __staticLock = new object();
+
         /// <summary>
         /// Returns the current running Xml transaction journal
         /// </summary>
@@ -33,7 +36,7 @@ namespace Wolfje.Plugins.SEconomy.Journal {
         public static XDocument JournalCopy {
             get {
                 XDocument journalCopy = null;
-                lock (XmlJournal) {
+                lock (__staticLock) {
                     journalCopy = new XDocument(XmlJournal);
                 }
 
@@ -53,7 +56,7 @@ namespace Wolfje.Plugins.SEconomy.Journal {
         /// </summary>
         public static IEnumerable<XBankAccount> BankAccounts {
             get {
-                lock (XmlJournal) {
+                lock (__staticLock) {
                     return XmlJournal.XPathSelectElements(@"/Journal/BankAccounts/BankAccount").Select(i => (XBankAccount)i);
                 }
             }
@@ -65,7 +68,7 @@ namespace Wolfje.Plugins.SEconomy.Journal {
         /// </summary>
         public static IEnumerable<XTransaction> Transactions {
             get {
-                lock (XmlJournal) {
+                lock (__staticLock) {
                     return XmlJournal.XPathSelectElements(@"/Journal/Transactions/Transaction").Select(i => (XTransaction)i);
                 }
             }
@@ -75,22 +78,26 @@ namespace Wolfje.Plugins.SEconomy.Journal {
         /// Adds an XBankAccount to the bank account collection.
         /// </summary>
         public static XBankAccount AddBankAccount(XBankAccount Account) {
-            Account.BankAccountK = RandomString(8);
+            lock (__staticLock) {
+                Account.BankAccountK = RandomString(8);
 
-            XmlJournal.XPathSelectElement("/Journal/BankAccounts").Add((XElement)Account);
+                XmlJournal.XPathSelectElement("/Journal/BankAccounts").Add((XElement)Account);
 
-            return Account;
+                return Account;
+            }
         }
 
         /// <summary>
         /// Adds an XTransaction to the transactions collection.
         /// </summary>
         public static XTransaction AddTransaction(XTransaction Transaction) {
-            Transaction.BankAccountTransactionK = RandomString(8);
+            lock (__staticLock) {
+                Transaction.BankAccountTransactionK = RandomString(8);
 
-            XmlJournal.XPathSelectElement("/Journal/Transactions").Add((XElement)Transaction);
+                XmlJournal.XPathSelectElement("/Journal/Transactions").Add((XElement)Transaction);
 
-            return Transaction;
+                return Transaction;
+            }
         }
 
         /// <summary>
@@ -99,13 +106,13 @@ namespace Wolfje.Plugins.SEconomy.Journal {
         public static XBankAccount EnsureWorldAccountExists() {
             XBankAccount worldAccount = null;
 
-            //World account matches the current world, ignore.
-            if (SEconomyPlugin.WorldAccount != null && SEconomyPlugin.WorldAccount.WorldID == Terraria.Main.worldID) {
-                return null;
-            }
+            lock (__staticLock) {
+                //World account matches the current world, ignore.
+                if (SEconomyPlugin.WorldAccount != null && SEconomyPlugin.WorldAccount.WorldID == Terraria.Main.worldID) {
+                    return null;
+                }
 
-            if (Terraria.Main.worldID > 0) {
-                lock (XmlJournal) {
+                if (Terraria.Main.worldID > 0) {
 
 
                     worldAccount = (from i in BankAccounts
@@ -144,7 +151,7 @@ namespace Wolfje.Plugins.SEconomy.Journal {
         /// Returns an XBankAccount by the UserAccountName
         /// </summary>
         public static XBankAccount GetBankAccountByName(string UserAccountName) {
-            lock (XmlJournal) {
+            lock (__staticLock) {
                 return BankAccounts.FirstOrDefault(i => i.UserAccountName == UserAccountName);
             }
         }
@@ -153,14 +160,15 @@ namespace Wolfje.Plugins.SEconomy.Journal {
         /// Returns a bank account by it's key.
         /// </summary>
         public static XBankAccount GetBankAccount(string BankAccountK) {
-            
-            Economy.EconomyPlayer matchingAccount = SEconomyPlugin.EconomyPlayers.Where(i => i.BankAccount != null).FirstOrDefault(i => i.BankAccount.BankAccountK != null && i.BankAccount.BankAccountK == BankAccountK);
-            //if the player is logged in return the logged in bank account reference
-            if (matchingAccount != null) {
-                return matchingAccount.BankAccount;
-            } else {
-                lock (XmlJournal) {
-                    return BankAccounts.FirstOrDefault(i => i.BankAccountK == BankAccountK);
+            lock (__staticLock) {
+                Economy.EconomyPlayer matchingAccount = SEconomyPlugin.EconomyPlayers.Where(i => i.BankAccount != null).FirstOrDefault(i => i.BankAccount.BankAccountK != null && i.BankAccount.BankAccountK == BankAccountK);
+                //if the player is logged in return the logged in bank account reference
+                if (matchingAccount != null) {
+                    return matchingAccount.BankAccount;
+                } else {
+                    lock (XmlJournal) {
+                        return BankAccounts.FirstOrDefault(i => i.BankAccountK == BankAccountK);
+                    }
                 }
             }
 
@@ -170,7 +178,7 @@ namespace Wolfje.Plugins.SEconomy.Journal {
         /// Deletes a bank account by it's key
         /// </summary>
         public static void DeleteBankAccount(string BankAccountK) {
-            lock (XmlJournal) {
+            lock (__staticLock) {
                 XElement account = (XElement)GetBankAccount(BankAccountK);
                 account.Remove();
             }
@@ -189,7 +197,7 @@ namespace Wolfje.Plugins.SEconomy.Journal {
         /// Deletes all transactions for an account, effectively returning their balance back to 0.
         /// </summary>
         public static void ResetAccountTransactions(string BankAccountK) {
-            lock (XmlJournal) {
+            lock (__staticLock) {
                 do {
                     XElement trans = XmlJournal.XPathSelectElement(string.Format("/Journal/Transactions/Transaction[@BankAccountFK=\"{0}\"]", BankAccountK));
 
@@ -313,16 +321,19 @@ A Transaction has these following attributes:
         /// Saves the transaction journal to an xml file.
         /// </summary>
         public static void SaveXml(string Path) {
-            //only one write may happen at a time
-            lock (__writeLock) {
-                using (MemoryStream ms = new MemoryStream()) {
-                    //For some dumbarse reason, XDocument.ToString doesn't render the XDeclaration tag.  The only way to get this is to call Save()
-                    //Save only supports a stream or file, we do not want disk I/O in this case
-                    JournalCopy.Save(ms);
+            if (Journal.TransactionJournal.XmlJournal != null) {
+                
+                //only one write may happen at a time
+                lock (__writeLock) {
+                    using (MemoryStream ms = new MemoryStream()) {
+                        //For some dumbarse reason, XDocument.ToString doesn't render the XDeclaration tag.  The only way to get this is to call Save()
+                        //Save only supports a stream or file, we do not want disk I/O in this case
+                        JournalCopy.Save(ms);
 
-                    byte[] compressedData = GZipCompress(ms.ToArray());
+                        byte[] compressedData = GZipCompress(ms.ToArray());
 
-                    File.WriteAllBytes(Path, compressedData);
+                        File.WriteAllBytes(Path, compressedData);
+                    }
                 }
             }
         }
@@ -333,23 +344,28 @@ A Transaction has these following attributes:
         /// </summary>
         public static Task SaveXmlAsync(string Path) {
 
-            //Only one write may happen at a time.
-            lock (__writeLock) {
-                //take a deep-copy of the running journal, so we write the deep copy instead of the running one, saves dumb blocking
-                using (MemoryStream ms = new MemoryStream()) {
-                    JournalCopy.Save(ms);
-                    byte[] compressedData = GZipCompress(ms.ToArray());
+            if (Journal.TransactionJournal.XmlJournal != null) {
 
-                    //Open the file with create flags, create flags create the file if it doesn't exist, or truncate existing data if it does.
-                    //Either way we end up with a clean file to write to.
-                    System.IO.FileStream fs = System.IO.File.Open(Path, System.IO.FileMode.Create);
+                //Only one write may happen at a time.
+                lock (__writeLock) {
+                    //take a deep-copy of the running journal, so we write the deep copy instead of the running one, saves dumb blocking
+                    using (MemoryStream ms = new MemoryStream()) {
+                        JournalCopy.Save(ms);
+                        byte[] compressedData = GZipCompress(ms.ToArray());
 
-                    //FromAsync takes a Begin/end IAsyncResult pair and applies the TPL model to it into a task, so that we can await it or treat it as an async block
-                    return Task.Factory.FromAsync(fs.BeginWrite, fs.EndWrite, compressedData, 0, compressedData.Length, null).ContinueWith((task) => {
-                        fs.Close();
-                        return task;
-                    });
+                        //Open the file with create flags, create flags create the file if it doesn't exist, or truncate existing data if it does.
+                        //Either way we end up with a clean file to write to.
+                        System.IO.FileStream fs = System.IO.File.Open(Path, System.IO.FileMode.Create);
+
+                        //FromAsync takes a Begin/end IAsyncResult pair and applies the TPL model to it into a task, so that we can await it or treat it as an async block
+                        return Task.Factory.FromAsync(fs.BeginWrite, fs.EndWrite, compressedData, 0, compressedData.Length, null).ContinueWith((task) => {
+                            fs.Close();
+                            return task;
+                        });
+                    }
                 }
+            } else {
+                return null;
             }
         }
 

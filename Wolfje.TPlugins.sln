@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wolfje.Plugins.SEconomy.Vau
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wolfje.Plugins.SEconomy.CmdAliasModule", "Wolfje.Plugins.SEconomy.CmdAliasModule\Wolfje.Plugins.SEconomy.CmdAliasModule.csproj", "{33D4B813-DB75-4201-8F7C-E3BA51C9FBC2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wolfje.Plugins.SEconomy.GamblingModule", "Wolfje.Plugins.SEconomy.GamblingModule\Wolfje.Plugins.SEconomy.GamblingModule.csproj", "{AE63BBBC-5E99-4BAA-B54A-AAADBD54B939}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -49,6 +51,16 @@ Global
 		{33D4B813-DB75-4201-8F7C-E3BA51C9FBC2}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{33D4B813-DB75-4201-8F7C-E3BA51C9FBC2}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{33D4B813-DB75-4201-8F7C-E3BA51C9FBC2}.Release|x86.ActiveCfg = Release|Any CPU
+		{AE63BBBC-5E99-4BAA-B54A-AAADBD54B939}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AE63BBBC-5E99-4BAA-B54A-AAADBD54B939}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AE63BBBC-5E99-4BAA-B54A-AAADBD54B939}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{AE63BBBC-5E99-4BAA-B54A-AAADBD54B939}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{AE63BBBC-5E99-4BAA-B54A-AAADBD54B939}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{AE63BBBC-5E99-4BAA-B54A-AAADBD54B939}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AE63BBBC-5E99-4BAA-B54A-AAADBD54B939}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AE63BBBC-5E99-4BAA-B54A-AAADBD54B939}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{AE63BBBC-5E99-4BAA-B54A-AAADBD54B939}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{AE63BBBC-5E99-4BAA-B54A-AAADBD54B939}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
