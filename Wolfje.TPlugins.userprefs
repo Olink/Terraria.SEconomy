@@ -1,0 +1,23 @@
+﻿<Properties>
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
+  <MonoDevelop.Ide.Workbench ActiveDocument="Wolfje.TPlugins/Wolfje.TPlugin.Bank/Journal/TransactionJournal.cs">
+    <Files>
+      <File FileName="Wolfje.TPlugins/Wolfje.TPlugin.Bank/Journal/TransactionJournal.cs" Line="337" Column="23" />
+    </Files>
+    <Pads>
+      <Pad Id="ProjectPad">
+        <State expanded="True">
+          <Node name="Wolfje.Plugins.SEconomy" expanded="True">
+            <Node name="Journal" expanded="True">
+              <Node name="TransactionJournal.cs" selected="True" />
+            </Node>
+          </Node>
+        </State>
+      </Pad>
+    </Pads>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+</Properties>
