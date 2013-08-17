@@ -221,53 +221,75 @@ namespace Wolfje.Plugins.SEconomy {
         }
 
         /// <summary>
+        /// Synchronization object to disable reentrancy into the transfer completed handler
+        /// </summary>
+        public static readonly object __transferCompleteLock = new object();
+
+        /// <summary>
+        /// Synchronizarion object to disable reentracy into the "get account" statics
+        /// </summary>
+        static object __accountSafeLock = new object();
+
+        /// <summary>
         /// Occurs when a bank transfer completes.
         /// </summary>
         void BankAccount_BankTransferCompleted(object sender, Journal.BankTransferEventArgs e) {
             //this is pretty balls too, but will do for now.
 
-            if ((e.TransferOptions & Journal.BankAccountTransferOptions.SuppressDefaultAnnounceMessages) == Journal.BankAccountTransferOptions.SuppressDefaultAnnounceMessages) {
-                return;
-            } else if (e.ReceiverAccount != null) {
+            lock (__transferCompleteLock) {
+                if ((e.TransferOptions & Journal.BankAccountTransferOptions.SuppressDefaultAnnounceMessages) == Journal.BankAccountTransferOptions.SuppressDefaultAnnounceMessages) {
+                    return;
+                } else if (e.ReceiverAccount != null) {
 
-                //Player died from PvP
-                if ((e.TransferOptions & Journal.BankAccountTransferOptions.MoneyFromPvP) == Journal.BankAccountTransferOptions.MoneyFromPvP) {
-                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToReceiver) == Journal.BankAccountTransferOptions.AnnounceToReceiver) {
-                        e.ReceiverAccount.Owner.TSPlayer.SendMessage(string.Format("You killed {0} and gained {1}.", e.SenderAccount.Owner.TSPlayer.Name, e.Amount.ToLongString()), Color.Orange);
-                    }
-                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToSender) == Journal.BankAccountTransferOptions.AnnounceToSender) {
-                        e.SenderAccount.Owner.TSPlayer.SendMessage(string.Format("{0} killed you and you lost {1}.", e.ReceiverAccount.Owner.TSPlayer.Name, e.Amount.ToLongString()), Color.Orange);
-                    }
+                    //Player died from PvP
+                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.MoneyFromPvP) == Journal.BankAccountTransferOptions.MoneyFromPvP) {
+                        if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToReceiver) == Journal.BankAccountTransferOptions.AnnounceToReceiver) {
+                            e.ReceiverAccount.Owner.TSPlayer.SendMessage(string.Format("You killed {0} and gained {1}.", e.SenderAccount.Owner.TSPlayer.Name, e.Amount.ToLongString()), Color.Orange);
+                        }
+                        if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToSender) == Journal.BankAccountTransferOptions.AnnounceToSender) {
+                            e.SenderAccount.Owner.TSPlayer.SendMessage(string.Format("{0} killed you and you lost {1}.", e.ReceiverAccount.Owner.TSPlayer.Name, e.Amount.ToLongString()), Color.Orange);
+                        }
 
-                    //P2P transfers, both the sender and the reciever get notified.
-                } else if ((e.TransferOptions & Journal.BankAccountTransferOptions.IsPlayerToPlayerTransfer) == Journal.BankAccountTransferOptions.IsPlayerToPlayerTransfer) {
-                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToReceiver) == Journal.BankAccountTransferOptions.AnnounceToReceiver) {
-                        e.ReceiverAccount.Owner.TSPlayer.SendMessage(string.Format("You received {0} from {1} Transaction # {2}", e.Amount.ToLongString(), e.SenderAccount.Owner.TSPlayer.Name, e.TransactionID), Color.Orange);
-                    }
-                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToSender) == Journal.BankAccountTransferOptions.AnnounceToSender) {
-                        e.SenderAccount.Owner.TSPlayer.SendMessage(string.Format("You sent {0} to {1}. Transaction # {2}", e.Amount.ToLongString(), e.ReceiverAccount.Owner.TSPlayer.Name, e.TransactionID), Color.Orange);
-                    }
+                        //P2P transfers, both the sender and the reciever get notified.
+                    } else if ((e.TransferOptions & Journal.BankAccountTransferOptions.IsPlayerToPlayerTransfer) == Journal.BankAccountTransferOptions.IsPlayerToPlayerTransfer) {
+                        if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToReceiver) == Journal.BankAccountTransferOptions.AnnounceToReceiver && e.ReceiverAccount != null && e.ReceiverAccount.Owner != null) {
+                            e.ReceiverAccount.Owner.TSPlayer.SendMessage(string.Format("You received {0} from {1}. Transaction # {2}", e.Amount.ToLongString(), e.SenderAccount.Owner != null ? e.SenderAccount.Owner.TSPlayer.Name : "The server", e.TransactionID), Color.Orange);
+                        }
+                        if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToSender) == Journal.BankAccountTransferOptions.AnnounceToSender && e.SenderAccount.Owner != null) {
+                            e.SenderAccount.Owner.TSPlayer.SendMessage(string.Format("You sent {0} to {1}. Transaction # {2}", e.Amount.ToLongString(), e.ReceiverAccount.Owner.TSPlayer.Name, e.TransactionID), Color.Orange);
+                        }
 
-                    //Everything else, including world to player, and player to world.
-                } else {
-                    string moneyVerb = "gained";
-                    if (e.Amount < 0) {
-                        if ((e.TransferOptions & Journal.BankAccountTransferOptions.IsPayment) == Journal.BankAccountTransferOptions.IsPayment) {
-                            moneyVerb = "paid";
-                        } else {
-                            moneyVerb = "lost";
+                        //Everything else, including world to player, and player to world.
+                    } else {
+                        string moneyVerb = "";
+
+                        if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToSender) == Journal.BankAccountTransferOptions.AnnounceToSender && e.SenderAccount.Owner != null) {
+
+                            if ((e.TransferOptions & Journal.BankAccountTransferOptions.IsPayment) == Journal.BankAccountTransferOptions.IsPayment) {
+                                moneyVerb = "paid";
+                            } else if (e.Amount > 0) {
+                                moneyVerb = "gained";
+                            } else {
+                                moneyVerb = "lost";
+                            }
+
+                            e.SenderAccount.Owner.TSPlayer.SendMessage(string.Format("You {0} {1}", moneyVerb, e.Amount.ToLongString()), Color.Orange);
+                        }
+                        if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToReceiver) == Journal.BankAccountTransferOptions.AnnounceToReceiver && e.ReceiverAccount.Owner != null) {
+                            if ((e.TransferOptions & Journal.BankAccountTransferOptions.IsPayment) == Journal.BankAccountTransferOptions.IsPayment) {
+                                moneyVerb = "got paid";
+                            } else if (e.Amount > 0) {
+                                moneyVerb = "gained";
+                            } else {
+                                moneyVerb = "lost";
+                            }
+
+                            e.ReceiverAccount.Owner.TSPlayer.SendMessage(string.Format("You {0} {1}", moneyVerb, e.Amount.ToLongString()), Color.Orange);
                         }
                     }
-
-                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToSender) == Journal.BankAccountTransferOptions.AnnounceToSender) {
-                        e.SenderAccount.Owner.TSPlayer.SendMessage(string.Format("You {0} {1}", moneyVerb, e.Amount.ToLongString()), Color.Orange);
-                    }
-                    if ((e.TransferOptions & Journal.BankAccountTransferOptions.AnnounceToReceiver) == Journal.BankAccountTransferOptions.AnnounceToReceiver) {
-                        e.ReceiverAccount.Owner.TSPlayer.SendMessage(string.Format("You {0} {1}", moneyVerb, e.Amount.ToLongString()), Color.Orange);
-                    }
+                } else if (e.TransferSucceeded == true) {
+                    TShockAPI.Log.ConsoleError("seconomy error: Bank account transfer completed without a receiver: ID " + e.TransactionID);
                 }
-            } else {
-                TShockAPI.Log.ConsoleError("seconomy error: Bank account transfer completed without a receiver: ID " + e.TransactionID);
             }
         }
 
@@ -347,13 +369,14 @@ namespace Wolfje.Plugins.SEconomy {
                     Money payAmount;
 
                     if (Money.TryParse(Configuration.IntervalPayAmount, out payAmount)) {
-                        foreach (Economy.EconomyPlayer ep in economyPlayers) {
-                            //if the time since the player was idle is less than or equal to the configuration idle threshold
-                            //then the player is considered not AFK.
-                            if (ep.TimeSinceIdle.TotalMinutes <= Configuration.IdleThresholdMinutes && ep.BankAccount != null) {
-                                //Pay them from the world account
-                                WorldAccount.TransferToAsync(ep.BankAccount, payAmount, Journal.BankAccountTransferOptions.AnnounceToReceiver);
-                                //WorldAccount.TransferAndReturn(ep.BankAccount, payAmount, Economy.BankAccountTransferOptions.AnnounceToReceiver);
+                        if (payAmount > 0) {
+                            foreach (Economy.EconomyPlayer ep in economyPlayers) {
+                                //if the time since the player was idle is less than or equal to the configuration idle threshold
+                                //then the player is considered not AFK.
+                                if (ep.TimeSinceIdle.TotalMinutes <= Configuration.IdleThresholdMinutes && ep.BankAccount != null) {
+                                    //Pay them from the world account
+                                    WorldAccount.TransferToAsync(ep.BankAccount, payAmount, Journal.BankAccountTransferOptions.AnnounceToReceiver);
+                                }
                             }
                         }
                     }
@@ -365,10 +388,11 @@ namespace Wolfje.Plugins.SEconomy {
 
         #region "Static APIs"
 
+
+   
         /// <summary>
         /// Gets an economy-enabled player by their player name. 
         /// </summary>
-        static object __accountSafeLock = new object();
         public static Economy.EconomyPlayer GetEconomyPlayerByBankAccountNameSafe(string Name) {
             lock (__accountSafeLock) {
                 return economyPlayers.FirstOrDefault(i => (i.BankAccount != null) && i.BankAccount.UserAccountName == Name);
@@ -390,13 +414,21 @@ namespace Wolfje.Plugins.SEconomy {
         public static Economy.EconomyPlayer GetEconomyPlayerSafe(int id) {
             Economy.EconomyPlayer p = null;
 
-            lock (__accountSafeLock) {
-                foreach (Economy.EconomyPlayer ep in economyPlayers) {
-                    if (ep.Index == id) {
-                        p = ep;
+            if (id < 0) {
+                //make a shitty faux account with the world account so that bank works from the console.
+                p = new Economy.EconomyPlayer(-1);
+                p.BankAccount = SEconomyPlugin.WorldAccount;
+            } else {
+                lock (__accountSafeLock) {
+                    foreach (Economy.EconomyPlayer ep in economyPlayers) {
+                        if (ep.Index == id) {
+                            p = ep;
+                        }
                     }
                 }
             }
+
+          
 
             return p;
         }

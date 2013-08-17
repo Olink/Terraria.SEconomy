@@ -103,6 +103,8 @@ namespace Wolfje.Plugins.SEconomy.Journal {
         /// Transfers money from this account to the destination account, if negative, takes money from the destination account into this account.
         /// </summary>
         public BankTransferEventArgs TransferTo(XBankAccount ToAccount, Money Amount, BankAccountTransferOptions Options, bool UseProfiler = true, string Message = "") {
+            
+            
             lock (__tranlock) {
                 BankTransferEventArgs args = new BankTransferEventArgs();
                 Guid profile = Guid.Empty;
@@ -140,10 +142,13 @@ namespace Wolfje.Plugins.SEconomy.Journal {
                     }
                 } else {
                     args.TransferSucceeded = false;
-                    if (Amount < 0) {
-                        this.Owner.TSPlayer.SendErrorMessageFormat("Invalid amount.");
-                    } else {
-                        this.Owner.TSPlayer.SendErrorMessageFormat("You need {0} more money to make this payment.", ((Money)(this.Balance - Amount)).ToLongString());
+
+                    if (!ToAccount.IsSystemAccount && !ToAccount.IsPluginAccount) {
+                        if (Amount < 0) {
+                            this.Owner.TSPlayer.SendErrorMessageFormat("Invalid amount.");
+                        } else {
+                            this.Owner.TSPlayer.SendErrorMessageFormat("You need {0} more money to make this payment.", ((Money)(this.Balance - Amount)).ToLongString());
+                        }
                     }
                 }
 

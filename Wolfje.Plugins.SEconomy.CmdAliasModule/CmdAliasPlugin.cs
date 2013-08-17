@@ -23,6 +23,8 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
         static readonly object __rndLock = new object();
         static readonly Random randomGenerator = new Random();
 
+        internal static Jint.JintEngine scriptEngine = new Jint.JintEngine();
+
         #region "API stub"
 
         public CmdAliasPlugin(Terraria.Main game) : base(game) { }
@@ -66,18 +68,23 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
         static readonly Dictionary<KeyValuePair<string, AliasCommand>, DateTime> CooldownList = new Dictionary<KeyValuePair<string, AliasCommand>, DateTime>();
 
         public override void Initialize()  {
-
             TShockAPI.Commands.ChatCommands.Add(new TShockAPI.Command("aliascmd", ChatCommand_GeneralCommand, "aliascmd") { AllowServer = true });
 
+            JScript.JScriptEngine.Initialize();
 
             Configuration = Configuration.LoadConfigurationFromFile("tshock" + System.IO.Path.DirectorySeparatorChar + "SEconomy" + System.IO.Path.DirectorySeparatorChar + "AliasCmd.config.json");
+      
+            foreach (string path in System.IO.Directory.EnumerateFiles("tshock" + System.IO.Path.DirectorySeparatorChar + "SEconomy", "*.js")) {
+                TShockAPI.Log.ConsoleInfo(string.Format("aliascmd js: loading file {0}.", path));
+                scriptEngine.Run(System.IO.File.ReadAllText(path));
+            }
+
             ParseCommands();
         }
 
         private void ChatCommand_GeneralCommand(TShockAPI.CommandArgs args) {
 
             if (args.Parameters.Count >= 1 && args.Parameters[0].Equals("reload", StringComparison.CurrentCultureIgnoreCase) && args.Player.Group.HasPermission("aliascmd.reloadconfig")) {
-
                 args.Player.SendInfoMessage("aliascmd: Reloading configuration file.");
 
                 ReloadConfigAfterDelayAsync(1).ContinueWith((task) => {
@@ -110,6 +117,13 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
                    Configuration reloadedConfig = Configuration.LoadConfigurationFromFile("tshock" + System.IO.Path.DirectorySeparatorChar + "SEconomy" + System.IO.Path.DirectorySeparatorChar + "AliasCmd.config.json");
                    Configuration = reloadedConfig;
 
+                   JScript.JScriptEngine.Initialize();
+
+                   foreach (string path in System.IO.Directory.EnumerateFiles("tshock" + System.IO.Path.DirectorySeparatorChar + "SEconomy", "*.js")) {
+                       TShockAPI.Log.ConsoleInfo(string.Format("aliascmd js: loading file {0}.", path));
+                       scriptEngine.Run(System.IO.File.ReadAllText(path));
+                   }
+
                    ParseCommands();
 
                } catch (Exception ex) {
@@ -136,6 +150,13 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
 					TShockAPI.Commands.ChatCommands.Add(newCommand);
 				}
 			}
+
+            lock (JScript.JScriptEngine.jsAliases) {
+                foreach (JScript.JScriptAliasCommand jCmd in JScript.JScriptEngine.jsAliases) {
+                    TShockAPI.Command newCommand = new TShockAPI.Command(jCmd.Permissions, ChatCommand_AliasExecuted, new string[] { jCmd.CommandAlias, "cmdalias." + jCmd.CommandAlias }) { AllowServer = true };
+                    TShockAPI.Commands.ChatCommands.Add(newCommand);
+                }
+            }
 		}
 
         /// <summary>
@@ -299,6 +320,64 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
             if (!string.IsNullOrEmpty(e.Message)) {
                 commandIdentifier = e.Message.Split(' ').FirstOrDefault();
             }
+
+            foreach (JScript.JScriptAliasCommand alias in JScript.JScriptEngine.jsAliases.Where(i => i.CommandAlias == commandIdentifier)) {
+                if (alias != null) {
+                    TimeSpan timeSinceLastUsedCommand = TimeSpan.MaxValue;
+                    //cooldown key is a pair of the user's character name, and the command they have called.
+                    //cooldown value is a DateTime they last used the command.
+                    KeyValuePair<string, AliasCommand> cooldownReference = new KeyValuePair<string, AliasCommand>(e.Player.Name, alias);
+
+                    if (CooldownList.ContainsKey(cooldownReference)) {
+                        //UTC time so we don't get any daylight saving shit cuntery
+                        timeSinceLastUsedCommand = DateTime.UtcNow.Subtract(CooldownList[cooldownReference]);
+                    }
+
+                    //has the time elapsed greater than the cooldown period?
+                    if (timeSinceLastUsedCommand.TotalSeconds >= alias.CooldownSeconds || e.Player.Group.HasPermission("aliascmd.bypasscooldown")) {
+                        Money commandCost = 0;
+                        Economy.EconomyPlayer ePlayer = SEconomyPlugin.GetEconomyPlayerSafe(e.Player.Index);
+
+                        if (!string.IsNullOrEmpty(alias.Cost) && Money.TryParse(alias.Cost, out commandCost) && !e.Player.Group.HasPermission("aliascmd.bypasscost") && commandCost > 0) {
+                            if (ePlayer.BankAccount != null) {
+
+                                if (!ePlayer.BankAccount.IsAccountEnabled) {
+                                    e.Player.SendErrorMessageFormat("You cannot use this command because your account is disabled.");
+                                } else if (ePlayer.BankAccount.Balance >= commandCost) {
+
+                                    //Take money off the player, and indicate that this is a payment for something tangible.
+                                    Journal.BankTransferEventArgs trans = SEconomyPlugin.WorldAccount.TransferTo(ePlayer.BankAccount, -commandCost, Journal.BankAccountTransferOptions.AnnounceToReceiver | Journal.BankAccountTransferOptions.IsPayment, Message: string.Format("AC: {0} cmd {1}", ePlayer.TSPlayer.Name, alias.CommandAlias));
+                                    if (trans.TransferSucceeded) {
+                                        //DoCommands(alias, ePlayer.TSPlayer, e.Parameters);
+                                        CallJSFunction(alias.func, ePlayer.TSPlayer, e.Parameters);
+                                    } else {
+                                        e.Player.SendErrorMessageFormat("Your payment failed.");
+                                    }
+                                } else {
+                                    e.Player.SendErrorMessageFormat("This command costs {0}. You need {1} more to be able to use this.", commandCost.ToLongString(), ((Money)(ePlayer.BankAccount.Balance - commandCost)).ToLongString());
+                                }
+                            } else {
+                                e.Player.SendErrorMessageFormat("This command costs money and you don't have a bank account.  Please log in first.");
+                            }
+                        } else {
+                            //Command is free
+                            CallJSFunction(alias.func, e.Player, e.Parameters);
+                        }
+
+                        //populate the cooldown list.  This dictionary does not go away when people leave so they can't
+                        //reset cooldowns by simply logging out or disconnecting.  They can reset it however by logging into 
+                        //a different account.
+                        if (CooldownList.ContainsKey(cooldownReference)) {
+                            CooldownList[cooldownReference] = DateTime.UtcNow;
+                        } else {
+                            CooldownList.Add(cooldownReference, DateTime.UtcNow);
+                        }
+
+                    } else {
+                        e.Player.SendErrorMessageFormat("{0}: You need to wait {1:0} more seconds to be able to use that.", alias.CommandAlias, (alias.CooldownSeconds - timeSinceLastUsedCommand.TotalSeconds));
+                    }
+                }
+            }
             
             //Get the corresponding alias in the config that matches what the user typed.
             foreach (AliasCommand alias in Configuration.CommandAliases.Where(i => i.CommandAlias == commandIdentifier)) {
@@ -359,15 +438,30 @@ namespace Wolfje.Plugins.SEconomy.CmdAliasModule {
             }
         }
 
+        /// <summary>
+        /// Error handler wrapping for calling of JS functions.
+        /// </summary>
+        public static object CallJSFunction(Jint.Native.JsFunction func, params object[] funcParameters) {
+
+            try {
+                return scriptEngine.CallFunction(func, funcParameters);
+            } catch (Jint.Native.JsException jsex ) {
+                TShockAPI.Log.ConsoleError("aliascmd js: Javascript parse error: " + jsex.Value);
+            } catch (Jint.JintException jex) {
+                TShockAPI.Log.ConsoleError("aliascmd js: Javascript runtime error: " + jex.Message);
+            } catch (Exception ex) {
+                TShockAPI.Log.ConsoleError("aliascmd js: CLR error: " + ex.ToString());
+            }
+
+            return null;
+        }
 
 
         /// <summary>
         /// This is a copy of TShocks handlecommand method, sans the permission checks
         /// </summary>
         public static bool HandleCommandWithoutPermissions(TShockAPI.TSPlayer player, string text) {
-
             string cmdText = text.Remove(0, 1);
-
             var args = SEconomyPlugin.CallPrivateMethod<List<string>>(typeof(TShockAPI.Commands), true, "ParseParameters", cmdText);
 
             if (args.Count < 1)

@@ -19,7 +19,11 @@ namespace Wolfje.Plugins.SEconomy.Economy {
         public int Index { get; set; }
         public TShockAPI.TSPlayer TSPlayer {
             get {
-                return TShockAPI.TShock.Players[Index];
+                if (Index < 0) {
+                    return TShockAPI.TSServerPlayer.Server;
+                } else {
+                    return TShockAPI.TShock.Players[Index];
+                }
             }
         }
 

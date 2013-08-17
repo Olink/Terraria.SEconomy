@@ -118,6 +118,12 @@ namespace Wolfje.Plugins.SEconomy {
             }
         }
 
+        public long Value {
+            get {
+                return _moneyValue;
+            }
+        }
+
         /// <summary>
         /// Returns the string representation of this money (in "pgsc" format)
         /// </summary>
@@ -142,7 +148,11 @@ namespace Wolfje.Plugins.SEconomy {
                     sb.AppendFormat("{0}s", moneyCopy.Silver);
                 }
 
-                sb.AppendFormat("{0}c", moneyCopy.Copper);
+                if (moneyCopy.Copper > 0) {
+                    sb.AppendFormat("{0}c", moneyCopy.Copper);
+                } else if (((long)moneyCopy) == 0) {
+                    sb.AppendFormat("{0}c", moneyCopy.Copper);
+                }
 
                 return sb.ToString();
             }

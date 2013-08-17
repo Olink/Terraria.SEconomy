@@ -48,9 +48,15 @@
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
+  <PropertyGroup>
+    <RunPostBuildEvent>Always</RunPostBuildEvent>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="HttpServer">
       <HintPath>..\BuildReferences\TShock\HttpServer.dll</HintPath>
+    </Reference>
+    <Reference Include="Jint">
+      <HintPath>..\BuildReferences\Jint.dll</HintPath>
     </Reference>
     <Reference Include="Mono.Data.Sqlite">
       <HintPath>..\BuildReferences\TShock\Mono.Data.Sqlite.dll</HintPath>
@@ -84,6 +90,8 @@
     <Compile Include="AliasCommand.cs" />
     <Compile Include="CmdAliasPlugin.cs" />
     <Compile Include="Configuration.cs" />
+    <Compile Include="JScriptAliasCommand.cs" />
+    <Compile Include="JScript\JScriptEngine.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -92,9 +100,13 @@
       <Name>Wolfje.Plugins.SEconomy</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="JInt.Extensions.cs" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>xcopy /y /i $(TargetPath) $(SolutionDir)\ServerInstance\ServerPlugins</PostBuildEvent>
+    <PostBuildEvent>$(SolutionDir)\packages\ilmerge.2.13.0307\ilmerge.exe /target:library /xmldocs /v4 /out:"$(TargetDir)$(TargetName)Merged.dll" "$(TargetPath)" "$(SolutionDir)BuildReferences\Jint.dll"
+xcopy /y "$(TargetDir)$(TargetName)Merged.dll" "$(SolutionDir)\ServerInstance\ServerPlugins"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
