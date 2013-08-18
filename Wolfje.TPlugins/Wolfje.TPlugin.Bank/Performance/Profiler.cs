@@ -17,7 +17,7 @@ namespace Wolfje.Plugins.SEconomy.Performance {
         List<Profile> _profilerTable;
 
         public Guid Enter(string Name) {
-            if (!Configuration.EnableProfiler) {
+            if (!SEconomyPlugin.Configuration.EnableProfiler) {
                 return Guid.Empty;
             }
 
@@ -45,7 +45,7 @@ namespace Wolfje.Plugins.SEconomy.Performance {
         }
 
         public string ExitString(Guid id) {
-            if (!Configuration.EnableProfiler) {
+            if (!SEconomyPlugin.Configuration.EnableProfiler) {
                 return "";
             }
 
@@ -59,7 +59,7 @@ namespace Wolfje.Plugins.SEconomy.Performance {
         }
 
         public void ExitLog(Guid id) {
-            if (!Configuration.EnableProfiler) {
+            if (!SEconomyPlugin.Configuration.EnableProfiler) {
                 return;
             }
 

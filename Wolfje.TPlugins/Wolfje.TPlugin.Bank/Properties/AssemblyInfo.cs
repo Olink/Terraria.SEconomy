@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("Wolfje.Plugins.SEconomy")]
-[assembly: AssemblyDescription("A server-side implementation of currency, with a drop-in replacement for Vault")]
+[assembly: AssemblyDescription("A server-side implementation of currency for servers running TShock")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Some shizzle for the internizzle")]
 [assembly: AssemblyProduct("Wolfje.Plugins.SEconomy")]
@@ -32,5 +32,5 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers 
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("0.1.2.1")]
-[assembly: AssemblyFileVersion("0.1.2.1")]
+[assembly: AssemblyVersion("0.1.3.1")]
+[assembly: AssemblyFileVersion("0.1.3.1")]

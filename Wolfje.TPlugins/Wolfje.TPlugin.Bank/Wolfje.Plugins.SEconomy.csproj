@@ -95,6 +95,7 @@
   <ItemGroup>
     <Compile Include="ChatCommands.cs" />
     <Compile Include="Configuration\Configuration.cs" />
+    <Compile Include="Configuration\MoneyProperties.cs" />
     <Compile Include="Economy\EconomyPlayer.cs" />
     <Compile Include="Enumerations.cs" />
     <Compile Include="Forms\CAccountManagementWnd.cs">

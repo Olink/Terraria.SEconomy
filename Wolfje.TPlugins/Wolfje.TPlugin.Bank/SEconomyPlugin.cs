@@ -53,13 +53,13 @@ namespace Wolfje.Plugins.SEconomy {
 
         public override string Description {
             get {
-                return "Provides server-sided currency and accounting for servers running TShock";
+                return "Provides server-sided currency tools for servers running TShock";
             }
         }
 
         public override string Name {
             get {
-                return "SEconomy (Milestone 1 BETA)";
+                return "SEconomy (Milestone 1 BETA) Update 3";
             }
         }
 
@@ -202,6 +202,8 @@ namespace Wolfje.Plugins.SEconomy {
             }
 
             WorldAccount = Journal.TransactionJournal.EnsureWorldAccountExists();
+
+            SEconomyPlugin.BackupCanRun = true;
         }
 
 

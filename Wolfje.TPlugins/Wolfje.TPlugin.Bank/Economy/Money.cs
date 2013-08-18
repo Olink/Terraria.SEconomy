@@ -20,7 +20,12 @@ namespace Wolfje.Plugins.SEconomy {
         private const int ONE_SILVER = 100;
         private const int ONE_COPPER = 1;
 
-        private static readonly Regex moneyRegex = new Regex(@"(-)?((\d*)p)?((\d*)g)?((\d*)s)?((\d*)c)?", RegexOptions.IgnoreCase);
+        private static readonly Regex moneyRegex = new Regex(string.Format(@"(-)?((\d*){0})?((\d*){1})?((\d*){2})?((\d*){3})?", SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant4Abbreviation,
+            SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant3Abbreviation, 
+            SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant2Abbreviation, 
+            SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant1Abbreviation), RegexOptions.IgnoreCase);
+
+        private static readonly Regex numberRegex = new Regex(@"(\d*)", RegexOptions.IgnoreCase);
 
         #region "Constructors"
 
@@ -80,7 +85,12 @@ namespace Wolfje.Plugins.SEconomy {
         public long Platinum {
             get {
                 lock (__staticLock) {
-                    return (long)Math.Floor((decimal)(_moneyValue / ONE_PLATINUM));
+                    if (SEconomyPlugin.Configuration.MoneyConfiguration.UseQuadrantNotation) {
+                        return (long)Math.Floor((decimal)(_moneyValue / ONE_PLATINUM));
+                    } else {
+                        return _moneyValue;
+                    }
+                    
                 }
             }
         }
@@ -91,7 +101,11 @@ namespace Wolfje.Plugins.SEconomy {
         public long Gold {
             get {
                 lock (__staticLock) {
-                    return (long)((_moneyValue % ONE_PLATINUM) - (_moneyValue % ONE_GOLD)) / 10000;
+                    if (SEconomyPlugin.Configuration.MoneyConfiguration.UseQuadrantNotation) {
+                        return (long)((_moneyValue % ONE_PLATINUM) - (_moneyValue % ONE_GOLD)) / 10000;
+                    } else {
+                        return _moneyValue;
+                    }
                 }
             }
         }
@@ -102,10 +116,15 @@ namespace Wolfje.Plugins.SEconomy {
         public long Silver {
             get {
                 lock (__staticLock) {
-                    return (long)((_moneyValue % ONE_GOLD) - (_moneyValue % ONE_SILVER)) / 100;
+                    if (SEconomyPlugin.Configuration.MoneyConfiguration.UseQuadrantNotation) {
+                        return (long)((_moneyValue % ONE_GOLD) - (_moneyValue % ONE_SILVER)) / 100;
+                    } else {
+                        return _moneyValue;
+                    }
                 }
             }
         }
+        
 
         /// <summary>
         /// Returns the Copper portion of this money instance
@@ -113,11 +132,18 @@ namespace Wolfje.Plugins.SEconomy {
         public long Copper {
             get {
                 lock (__staticLock) {
-                    return (long)_moneyValue % 100;
+                    if (SEconomyPlugin.Configuration.MoneyConfiguration.UseQuadrantNotation) {
+                        return (long)_moneyValue % 100;
+                    } else {
+                        return _moneyValue;
+                    }
                 }
             }
         }
 
+        /// <summary>
+        /// Returns the raw value of this structure.
+        /// </summary>
         public long Value {
             get {
                 return _moneyValue;
@@ -125,33 +151,41 @@ namespace Wolfje.Plugins.SEconomy {
         }
 
         /// <summary>
-        /// Returns the string representation of this money (in "pgsc" format)
+        /// Returns the string representation of this money
         /// </summary>
         public override string ToString() {
             lock (__staticLock) {
+
                 StringBuilder sb = new StringBuilder();
-                Money moneyCopy = this;
 
-                //Negative balances still need to display like they are positives
-                if (moneyCopy < 0) {
-                    sb.Append("-");
-                    moneyCopy = moneyCopy * (-1);
-                }
+                if (SEconomyPlugin.Configuration.MoneyConfiguration.UseQuadrantNotation) {
+                    Money moneyCopy = this;
 
-                if (moneyCopy.Platinum > 0) {
-                    sb.AppendFormat("{0}p", moneyCopy.Platinum);
-                }
-                if (moneyCopy.Gold > 0) {
-                    sb.AppendFormat("{0}g", moneyCopy.Gold);
-                }
-                if (moneyCopy.Silver > 0) {
-                    sb.AppendFormat("{0}s", moneyCopy.Silver);
-                }
+                    //Negative balances still need to display like they are positives
+                    if (moneyCopy < 0) {
+                        sb.Append("-");
+                        moneyCopy = moneyCopy * (-1);
+                    }
 
-                if (moneyCopy.Copper > 0) {
-                    sb.AppendFormat("{0}c", moneyCopy.Copper);
-                } else if (((long)moneyCopy) == 0) {
-                    sb.AppendFormat("{0}c", moneyCopy.Copper);
+                    if (moneyCopy.Platinum > 0) {
+                        sb.AppendFormat("{0}{1}", moneyCopy.Platinum, SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant4Abbreviation);
+                    }
+                    if (moneyCopy.Gold > 0) {
+                        sb.AppendFormat("{0}{1}", moneyCopy.Gold, SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant3Abbreviation);
+                    }
+                    if (moneyCopy.Silver > 0) {
+                        sb.AppendFormat("{0}{1}", moneyCopy.Silver, SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant2Abbreviation);
+                    }
+
+                    if (moneyCopy.Copper > 0) {
+                        sb.AppendFormat("{0}{1}", moneyCopy.Copper, SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant1Abbreviation);
+                    } else if (((long)moneyCopy) == 0) {
+                        sb.AppendFormat("{0}{1}", moneyCopy.Copper, SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant1Abbreviation);
+                    }
+
+                } else {
+                    //Used in singular format: produces something like "1 coin", or "612 coins."
+                    sb.AppendFormat("{0} {1}", this.Value, this.Value > 1 ? SEconomyPlugin.Configuration.MoneyConfiguration.MoneyNamePlural : SEconomyPlugin.Configuration.MoneyConfiguration.MoneyName);
                 }
 
                 return sb.ToString();
@@ -177,21 +211,25 @@ namespace Wolfje.Plugins.SEconomy {
 
                     Interlocked.Exchange(ref moneyCopy, moneyCopy * (-1));
                 }
+                
+                if (SEconomyPlugin.Configuration.MoneyConfiguration.UseQuadrantNotation) {
+                    if (((Money)moneyCopy).Platinum > 0) {
+                        sb.AppendFormat("{0} {1}", ((Money)moneyCopy).Platinum, SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant4FullName);
+                    }
+                    if (((Money)moneyCopy).Gold > 0) {
+                        sb.AppendFormat("{1}{0} {2}", ((Money)moneyCopy).Gold, sb.Length > 0 ? " " : "", SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant3FullName);
+                    }
+                    if (((Money)moneyCopy).Silver > 0) {
+                        sb.AppendFormat("{1}{0} {2}", ((Money)moneyCopy).Silver, sb.Length > 0 ? " " : "", SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant2FullName);
+                    }
 
-                if (((Money)moneyCopy).Platinum > 0) {
-                    sb.AppendFormat("{0} plat", ((Money)moneyCopy).Platinum);
+                    if (((Money)moneyCopy).Copper > 0 || ((Money)moneyCopy)._moneyValue == 0) {
+                        sb.AppendFormat("{1}{0} {2}", ((Money)moneyCopy).Copper, sb.Length > 0 ? " " : "", SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant1FullName);
+                    }
+                } else {
+                    //Used in singular format: produces something like "1 coin", or "612 coins."
+                    sb.AppendFormat("{0} {1}", this.Value, this.Value > 1 ? SEconomyPlugin.Configuration.MoneyConfiguration.MoneyNamePlural : SEconomyPlugin.Configuration.MoneyConfiguration.MoneyName);
                 }
-                if (((Money)moneyCopy).Gold > 0) {
-                    sb.AppendFormat("{1}{0} gold", ((Money)moneyCopy).Gold, sb.Length > 0 ? " " : "");
-                }
-                if (((Money)moneyCopy).Silver > 0) {
-                    sb.AppendFormat("{1}{0} silver", ((Money)moneyCopy).Silver, sb.Length > 0 ? " " : "");
-                }
-
-                if (((Money)moneyCopy).Copper > 0 || ((Money)moneyCopy)._moneyValue == 0) {
-                    sb.AppendFormat("{1}{0} copper", ((Money)moneyCopy).Copper, sb.Length > 0 ? " " : "");
-                }
-
                 return sb.ToString();
             }
         }
@@ -228,38 +266,52 @@ namespace Wolfje.Plugins.SEconomy {
             lock (__staticLock) {
                 long totalMoney = 0;
 
-                if (!string.IsNullOrWhiteSpace(MoneyRepresentation) && new Regex("p|g|s|c").IsMatch(MoneyRepresentation)) {
-                    Match moneyMatch = moneyRegex.Match(MoneyRepresentation);
-                    long plat = 0, gold = 0, silver = 0, copper = 0;
-                    string signedness = "";
+                if (SEconomyPlugin.Configuration.MoneyConfiguration.UseQuadrantNotation) {
 
-                    if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[1].Value))
-                        signedness = moneyMatch.Groups[1].Value;
+                    if (!string.IsNullOrWhiteSpace(MoneyRepresentation) && new Regex(string.Format(@"{0}|{1}|{2}|{3}", SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant4Abbreviation,
+                            SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant3Abbreviation,
+                            SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant2Abbreviation,
+                            SEconomyPlugin.Configuration.MoneyConfiguration.Quadrant1Abbreviation)).IsMatch(MoneyRepresentation)) {
+                        Match moneyMatch = moneyRegex.Match(MoneyRepresentation);
+                        long plat = 0, gold = 0, silver = 0, copper = 0;
+                        string signedness = "";
 
-                    if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[2].Value))
-                        plat = long.Parse(moneyMatch.Groups[3].Value);
+                        if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[1].Value))
+                            signedness = moneyMatch.Groups[1].Value;
 
-                    if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[4].Value))
-                        gold = long.Parse(moneyMatch.Groups[5].Value);
+                        if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[2].Value))
+                            plat = long.Parse(moneyMatch.Groups[3].Value);
 
-                    if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[6].Value))
-                        silver = long.Parse(moneyMatch.Groups[7].Value);
+                        if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[4].Value))
+                            gold = long.Parse(moneyMatch.Groups[5].Value);
 
-                    if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[8].Value))
-                        copper = long.Parse(moneyMatch.Groups[9].Value);
+                        if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[6].Value))
+                            silver = long.Parse(moneyMatch.Groups[7].Value);
 
-                    totalMoney += plat * ONE_PLATINUM;
-                    totalMoney += gold * ONE_GOLD;
-                    totalMoney += silver * ONE_SILVER;
-                    totalMoney += copper;
+                        if (!string.IsNullOrWhiteSpace(moneyMatch.Groups[8].Value))
+                            copper = long.Parse(moneyMatch.Groups[9].Value);
 
-                    //you can specify a minus at the start to indicate a negative amount.
-                    if (!string.IsNullOrWhiteSpace(signedness)) {
-                        totalMoney = -totalMoney;
+                        totalMoney += plat * ONE_PLATINUM;
+                        totalMoney += gold * ONE_GOLD;
+                        totalMoney += silver * ONE_SILVER;
+                        totalMoney += copper;
+
+                        //you can specify a minus at the start to indicate a negative amount.
+                        if (!string.IsNullOrWhiteSpace(signedness)) {
+                            totalMoney = -totalMoney;
+                        }
+                    } else {
+                        //Attempt a plain conversion from a whole integer
+                        long.TryParse(MoneyRepresentation, out totalMoney);
                     }
                 } else {
-                    //Attempt a plain conversion from a whole integer
-                    long.TryParse(MoneyRepresentation, out totalMoney);
+                    if (numberRegex.IsMatch(MoneyRepresentation)) {
+                        Match numberMatch = numberRegex.Match(MoneyRepresentation);
+                        if (numberMatch.Groups.Count > 1) {
+                            //Attempt a plain conversion from a whole integer
+                            long.TryParse(numberMatch.Groups[1].Value, out totalMoney);
+                        }
+                    }
                 }
 
                 return totalMoney;

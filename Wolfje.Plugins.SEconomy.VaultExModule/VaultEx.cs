@@ -37,7 +37,7 @@ namespace Wolfje.Plugins.SEconomy.VaultExModule {
 
         public override string Name {
             get {
-                return "Suck my dick";
+                return "VaultEx";
             }
         }
 

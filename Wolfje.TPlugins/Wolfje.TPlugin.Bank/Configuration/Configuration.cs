@@ -15,11 +15,13 @@ namespace Wolfje.Plugins.SEconomy {
         public int IdleThresholdMinutes = 10;
         public string IntervalPayAmount = "0";
         public static string BaseDirectory = @"tshock" + System.IO.Path.DirectorySeparatorChar + "SEconomy";
-        public static string JournalPath = BaseDirectory + System.IO.Path.DirectorySeparatorChar + "SEconomy.journal.xml.gz";
+        public static string JournalPath = Configuration.BaseDirectory + System.IO.Path.DirectorySeparatorChar + "SEconomy.journal.xml.gz";
 
-        public static int JournalBackupMinutes = 1;
+        public int JournalBackupMinutes = 1;
 
-        public static bool EnableProfiler = false;
+        public MoneyProperties MoneyConfiguration = new MoneyProperties();
+
+        public bool EnableProfiler = false;
 
         /// <summary>
         /// Loads a configuration file and deserializes it from JSON
