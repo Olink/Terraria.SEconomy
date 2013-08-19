@@ -18,7 +18,7 @@ namespace Wolfje.Plugins.SEconomy {
     /// 
     /// API Version 1.12
     /// </summary>
-    [APIVersion(1, 12)]
+    [APIVersion(1, 13)]
     public class SEconomyPlugin : TerrariaPlugin {
   
         internal static readonly Performance.Profiler Profiler = new Performance.Profiler();
@@ -83,7 +83,7 @@ namespace Wolfje.Plugins.SEconomy {
              
             economyPlayers = new List<Economy.EconomyPlayer>();
 
-            TShockAPI.Hooks.PlayerHooks.PlayerLogin += PlayerHooks_PlayerLogin;
+            TShockAPI.Hooks.PlayerHooks.PlayerPostLogin += PlayerHooks_PlayerPostLogin;
 
             Hooks.GameHooks.PostInitialize += GameHooks_PostInitialize;
             Hooks.ServerHooks.Join += ServerHooks_Join;
@@ -132,7 +132,7 @@ namespace Wolfje.Plugins.SEconomy {
         protected override void Dispose(bool disposing) {
 
             if (disposing) {
-                TShockAPI.Hooks.PlayerHooks.PlayerLogin -= PlayerHooks_PlayerLogin;
+                TShockAPI.Hooks.PlayerHooks.PlayerPostLogin -= PlayerHooks_PlayerPostLogin;
 
                 Hooks.ServerHooks.Join -= ServerHooks_Join;
                 Hooks.NetHooks.GetData -= NetHooks_GetData;
@@ -353,7 +353,7 @@ namespace Wolfje.Plugins.SEconomy {
         /// <summary>
         /// Fires when a user logs in.
         /// </summary>
-        void PlayerHooks_PlayerLogin(TShockAPI.Hooks.PlayerLoginEventArgs e) {
+        void PlayerHooks_PlayerPostLogin(TShockAPI.Hooks.PlayerPostLoginEventArgs e) {
             Economy.EconomyPlayer ePlayer = GetEconomyPlayerSafe(e.Player.Index);
 
             //Ensure a bank account for the economy player exists, and asynchronously load it.
