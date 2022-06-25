@@ -25,6 +25,8 @@
     <WarningLevel>4</WarningLevel>
     <CustomCommands>
       <CustomCommands>
+       <Debug commands="Item.NewItem
+like so Item.NewItem(new EntitySource_DebugCommand(), ...>
         <Command type="Execute" command="../../ServerInstance/TerrariaServer.exe" workingdir="../../ServerInstance/" externalConsole="True" />
         <Command type="BeforeExecute" />
       </CustomCommands>
